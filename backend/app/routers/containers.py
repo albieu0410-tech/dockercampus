@@ -20,7 +20,7 @@ async def list_containers(
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(Container).where(Container.owner_id == current_user.id)
+        select(Container).where(Container.user_id == current_user.id)
     )
     return result.scalars().all()
 
@@ -34,8 +34,8 @@ async def create_container(
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(
-                f"{RUST_SERVICE_URL}/containers/create",
-                json={"name": body.name, "image": body.image},
+                f"{RUST_SERVICE_URL}/containers",
+                json={"name": body.name, "image": body.image, "user_id": str(current_user.id)},
                 timeout=10,
             )
             resp.raise_for_status()
@@ -43,16 +43,13 @@ async def create_container(
             raise HTTPException(status_code=502, detail=f"Rust service error: {e}")
 
     rust_data = resp.json()
-    container = Container(
-        container_id=rust_data["container_id"],
-        name=body.name,
-        image=body.image,
-        status="stopped",
-        owner_id=current_user.id,
+
+    result = await db.execute(
+        select(Container).where(Container.id == rust_data["id"])
     )
-    db.add(container)
-    await db.commit()
-    await db.refresh(container)
+    container = result.scalar_one_or_none()
+    if not container:
+        raise HTTPException(status_code=500, detail="Container created but not found in DB")
     return container
 
 
@@ -65,8 +62,8 @@ async def container_action(
 ):
     result = await db.execute(
         select(Container).where(
-            Container.container_id == container_id,
-            Container.owner_id == current_user.id,
+            Container.id == container_id,
+            Container.user_id == current_user.id,
         )
     )
     container = result.scalar_one_or_none()
@@ -83,9 +80,7 @@ async def container_action(
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail=f"Rust service error: {e}")
 
-    container.status = "running" if body.action == "start" else "stopped"
-    await db.commit()
-    return {"container_id": container_id, "status": container.status}
+    return {"container_id": container_id, "status": body.action}
 
 
 @router.delete("/{container_id}", status_code=204)
@@ -96,8 +91,8 @@ async def delete_container(
 ):
     result = await db.execute(
         select(Container).where(
-            Container.container_id == container_id,
-            Container.owner_id == current_user.id,
+            Container.id == container_id,
+            Container.user_id == current_user.id,
         )
     )
     container = result.scalar_one_or_none()

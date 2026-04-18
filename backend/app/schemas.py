@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from app.models import UserRole
+from app.models import UserRole, ContainerStatus
 import uuid
 
 
@@ -39,15 +39,16 @@ class ContainerCreate(BaseModel):
 
 class ContainerOut(BaseModel):
     id: uuid.UUID
-    container_id: str
-    name: str
-    image: str
-    status: str
-    owner_id: uuid.UUID
+    docker_container_id: str | None
+    port: int
+    status: ContainerStatus
+    cpu_limit: float
+    memory_limit_mb: int
+    user_id: uuid.UUID
     created_at: datetime
 
     model_config = {"from_attributes": True}
 
 
 class ContainerAction(BaseModel):
-    action: str
+    action: str  # "start" | "stop" | "restart"
