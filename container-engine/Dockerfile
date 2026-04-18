@@ -1,7 +1,6 @@
-FROM rust:latest as builder
+FROM rust:latest AS builder
 WORKDIR /app
 COPY Cargo.toml ./
-RUN cargo fetch
 COPY src ./src
 RUN cargo build --release
 
