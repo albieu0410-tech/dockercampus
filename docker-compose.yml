@@ -4,13 +4,43 @@ services:
     container_name: dockcampus-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: dockcampus
-      POSTGRES_PASSWORD: changeme123
-      POSTGRES_DB: dockcampus
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+    container_name: dockcampus-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+
+  container-engine:
+    build:
+      context: ./container-engine
+    container_name: dockcampus-engine
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "8081:8080"
+
+  student-container:
+    build:
+      context: ./student-container
+    container_name: dockcampus-student
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
 
 volumes:
   postgres_data:
