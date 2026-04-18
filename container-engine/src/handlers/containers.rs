@@ -179,7 +179,7 @@ async fn delete_container(
     .await?
     .ok_or_else(|| AppError::NotFound(format!("Container for user {} not found", user_id)))?;
 
-    if let Some(docker_id) = container.docker_container_id {
+    if let Some(docker_id) = container.docker_container_id.as_deref() {
         state.docker.remove_container(&docker_id).await?;
     }
 

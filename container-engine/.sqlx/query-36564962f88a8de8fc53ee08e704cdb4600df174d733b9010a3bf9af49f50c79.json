@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO containers (user_id, docker_container_id, port, status, cpu_limit, memory_limit_mb)\n        VALUES ($1, $2, $3, 'running', $4, $5)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Int4",
+        "Float8",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "36564962f88a8de8fc53ee08e704cdb4600df174d733b9010a3bf9af49f50c79"
+}

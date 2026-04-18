@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE containers SET status = 'stopped' WHERE user_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "662e38f5d86355420e36859c0811b2f320b99d66cc72a65da584b07d8bf7d4cb"
+}

@@ -1,0 +1,73 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT c.id, c.user_id, c.docker_container_id,\n               c.port, c.status as \"status: String\",\n               c.cpu_limit, c.memory_limit_mb, c.created_at\n        FROM containers c\n        ORDER BY c.created_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "docker_container_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "port",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "status: String",
+        "type_info": {
+          "Custom": {
+            "name": "container_status",
+            "kind": {
+              "Enum": [
+                "running",
+                "stopped",
+                "error"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "cpu_limit",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 6,
+        "name": "memory_limit_mb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a79c5dafb218ddc67bbb41521a703c743b8587ec5edfd7ac24da69a2274398a0"
+}

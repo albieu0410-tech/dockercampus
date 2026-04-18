@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT docker_container_id, port FROM containers WHERE user_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "docker_container_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "port",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "d30486c265318c7289bf037e04d3f9e4ffd532e8b32bb36b38e6025f7262ed54"
+}
