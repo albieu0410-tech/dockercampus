@@ -18,7 +18,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
-        PgEnum(UserRole, name="userrole"), nullable=False, default=UserRole.student
+        PgEnum(UserRole, name="user_role"), nullable=False, default=UserRole.student
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
