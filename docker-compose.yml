@@ -41,5 +41,16 @@ services:
       - db
       - container-engine
 
+  frontend:
+    build: ./frontend
+    container_name: dockcampus-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: https://dockcampus.sudelca.com
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
