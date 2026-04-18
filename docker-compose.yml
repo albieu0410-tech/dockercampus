@@ -26,5 +26,20 @@ services:
     depends_on:
       - db
 
+  backend:
+    build: ./backend
+    container_name: dockcampus-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://dockcampus:j303871992@db:5432/dockcampus
+      RUST_SERVICE_URL: http://container-engine:8001
+      SECRET_KEY: change-me-in-production
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - container-engine
+
 volumes:
   postgres_data:
