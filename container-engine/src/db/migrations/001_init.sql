@@ -1,7 +1,14 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TYPE user_role AS ENUM ('student', 'professor');
-CREATE TYPE container_status AS ENUM ('running', 'stopped', 'error');
+DO $$ BEGIN
+    CREATE TYPE user_role AS ENUM ('student', 'professor');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE container_status AS ENUM ('running', 'stopped', 'error');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
