@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from app.models import UserRole
+import uuid
 
 
 class RegisterRequest(BaseModel):
@@ -21,7 +22,7 @@ class TokenResponse(BaseModel):
 
 
 class UserOut(BaseModel):
-    id: int
+    id: uuid.UUID
     email: str
     full_name: str
     role: UserRole
@@ -37,16 +38,16 @@ class ContainerCreate(BaseModel):
 
 
 class ContainerOut(BaseModel):
-    id: int
+    id: uuid.UUID
     container_id: str
     name: str
     image: str
     status: str
-    owner_id: int
+    owner_id: uuid.UUID
     created_at: datetime
 
     model_config = {"from_attributes": True}
 
 
 class ContainerAction(BaseModel):
-    action: str  # "start" | "stop" | "restart"
+    action: str

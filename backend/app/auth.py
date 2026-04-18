@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import os
+import uuid
 
 from app.database import get_db
 from app.models import User
@@ -47,7 +48,7 @@ async def get_current_user(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = int(payload.get("sub"))
+        user_id = uuid.UUID(payload.get("sub"))
     except (JWTError, TypeError, ValueError):
         raise credentials_exception
 
