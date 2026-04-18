@@ -4,10 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import os
 
-from database import get_db
-from models import User, Container
-from schemas import ContainerCreate, ContainerOut, ContainerAction
-from auth import get_current_user
+from app.database import get_db
+from app.models import User, Container
+from app.schemas import ContainerCreate, ContainerOut, ContainerAction
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/containers", tags=["containers"])
 
@@ -43,7 +43,6 @@ async def create_container(
             raise HTTPException(status_code=502, detail=f"Rust service error: {e}")
 
     rust_data = resp.json()
-
     container = Container(
         container_id=rust_data["container_id"],
         name=body.name,
