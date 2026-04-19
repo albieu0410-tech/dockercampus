@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -18,8 +18,10 @@ async def get_me(current_user: User = Depends(get_current_user)):
 @router.get("", response_model=list[UserOut])
 async def list_users(
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_professor),
+    current_user: User = Depends(get_current_user),
 ):
+    if current_user.role.value not in ("admin", "professor"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     result = await db.execute(select(User))
     return result.scalars().all()
 
