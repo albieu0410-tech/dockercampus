@@ -29,3 +29,5 @@ RUN mkdir -p /home/coder/workspace
 WORKDIR /home/coder/workspace
 
 EXPOSE 8080
+
+CMD ["code-server", "--auth", "none", "--bind-addr", "0.0.0.0:8080", "/home/coder/workspace"]
