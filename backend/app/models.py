@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Enum as PgEnum, Integer, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -29,6 +31,8 @@ class User(Base):
         PgEnum(UserRole, name="user_role", create_type=False), nullable=False, default=UserRole.student
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    firebase_uid: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -86,3 +90,31 @@ class Deployment(Base):
 
     owner: Mapped["User"] = relationship("User")
     container: Mapped["Container"] = relationship("Container")
+
+
+class InviteCode(Base):
+    __tablename__ = "invite_codes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    role: Mapped[UserRole] = mapped_column(
+        PgEnum(UserRole, name="user_role", create_type=False),
+        nullable=False,
+        default=UserRole.student,
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    used_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class OTPSession(Base):
+    __tablename__ = "otp_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    firebase_session_info: Mapped[str] = mapped_column(String, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

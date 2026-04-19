@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
+from typing import Optional
 from app.models import UserRole, ContainerStatus
 import uuid
 
@@ -8,7 +9,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
     full_name: str
-    role: UserRole = UserRole.student
+    invite_code: str
 
 
 class LoginRequest(BaseModel):
@@ -19,6 +20,16 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class LoginResponse(BaseModel):
+    otp_session_id: uuid.UUID
+    message: str = "OTP sent to your email. Submit it to complete login."
+
+
+class VerifyOTPRequest(BaseModel):
+    otp_session_id: uuid.UUID
+    otp_code: str
 
 
 class UserOut(BaseModel):
@@ -75,5 +86,20 @@ class DeploymentOut(BaseModel):
     status: str
     build_logs: str | None
     public_url: str | None
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class InviteCodeCreate(BaseModel):
+    role: UserRole = UserRole.student
+    expires_at: Optional[datetime] = None
+
+
+class InviteCodeOut(BaseModel):
+    id: uuid.UUID
+    code: str
+    role: UserRole
+    is_used: bool
+    expires_at: Optional[datetime]
     created_at: datetime
     model_config = {"from_attributes": True}

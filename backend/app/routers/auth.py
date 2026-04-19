@@ -1,42 +1,164 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+import secrets
+import uuid
+from datetime import datetime, timedelta
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select, delete
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    firebase_send_otp,
+    firebase_verify_otp,
+    require_role,
+)
 from app.database import get_db
-from app.models import User
-from app.schemas import RegisterRequest, LoginRequest, TokenResponse
-from app.auth import hash_password, verify_password, create_access_token
+from app.models import User, InviteCode, OTPSession
+from app.schemas import (
+    RegisterRequest,
+    LoginRequest,
+    LoginResponse,
+    VerifyOTPRequest,
+    TokenResponse,
+    UserOut,
+    InviteCodeCreate,
+    InviteCodeOut,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+OTP_SESSION_TTL_MINUTES = 10
+MAX_OTP_ATTEMPTS = 5
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == body.email))
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Email already registered")
+    invite_result = await db.execute(
+        select(InviteCode).where(
+            InviteCode.code == body.invite_code,
+            InviteCode.is_used == False,
+        )
+    )
+    invite = invite_result.scalar_one_or_none()
+    if not invite:
+        raise HTTPException(status_code=400, detail="Invalid or already-used invite code")
+    if invite.expires_at and invite.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invite code has expired")
+
+    user_result = await db.execute(select(User).where(User.email == body.email))
+    if user_result.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Email already registered")
 
     user = User(
         email=body.email,
         hashed_password=hash_password(body.password),
         full_name=body.full_name,
-        role=body.role,
+        role=invite.role,
+        is_verified=False,
     )
     db.add(user)
+    await db.flush()
+
+    invite.is_used = True
+    invite.used_by = user.id
+
     await db.commit()
     await db.refresh(user)
-
-    token = create_access_token({"sub": str(user.id)})
-    return TokenResponse(access_token=token)
+    return user
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=LoginResponse)
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(body.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account is disabled")
+
+    session_info = await firebase_send_otp(user.email)
+
+    await db.execute(delete(OTPSession).where(OTPSession.user_id == user.id))
+
+    otp_session = OTPSession(
+        user_id=user.id,
+        firebase_session_info=session_info,
+        expires_at=datetime.utcnow() + timedelta(minutes=OTP_SESSION_TTL_MINUTES),
+    )
+    db.add(otp_session)
+    await db.commit()
+    await db.refresh(otp_session)
+
+    return LoginResponse(otp_session_id=otp_session.id)
+
+
+@router.post("/verify-otp", response_model=TokenResponse)
+async def verify_otp(body: VerifyOTPRequest, db: AsyncSession = Depends(get_db)):
+    session_result = await db.execute(
+        select(OTPSession).where(OTPSession.id == body.otp_session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="OTP session not found")
+
+    if session.expires_at < datetime.utcnow():
+        await db.delete(session)
+        await db.commit()
+        raise HTTPException(status_code=410, detail="OTP expired. Please log in again.")
+
+    if session.attempts >= MAX_OTP_ATTEMPTS:
+        await db.delete(session)
+        await db.commit()
+        raise HTTPException(status_code=429, detail="Too many attempts. Please log in again.")
+
+    user_result = await db.execute(select(User).where(User.id == session.user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        firebase_uid = await firebase_verify_otp(
+            session.firebase_session_info,
+            body.otp_code,
+            user.email,
+        )
+    except HTTPException:
+        session.attempts += 1
+        await db.commit()
+        remaining = MAX_OTP_ATTEMPTS - session.attempts
+        raise HTTPException(status_code=401, detail=f"Invalid OTP. {remaining} attempt(s) remaining.")
+
+    if not user.is_verified:
+        user.is_verified = True
+        user.firebase_uid = firebase_uid
+
+    await db.delete(session)
+    await db.commit()
 
     token = create_access_token({"sub": str(user.id)})
     return TokenResponse(access_token=token)
+
+
+@router.post("/invite-codes", response_model=InviteCodeOut, status_code=status.HTTP_201_CREATED)
+async def create_invite_code(
+    body: InviteCodeCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    invite = InviteCode(code=secrets.token_urlsafe(16), role=body.role, expires_at=body.expires_at)
+    db.add(invite)
+    await db.commit()
+    await db.refresh(invite)
+    return invite
+
+
+@router.get("/invite-codes", response_model=list[InviteCodeOut])
+async def list_invite_codes(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    result = await db.execute(select(InviteCode).order_by(InviteCode.created_at.desc()))
+    return result.scalars().all()
