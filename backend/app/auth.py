@@ -107,6 +107,7 @@ async def firebase_send_otp(email: str) -> str:
         "requestType": "EMAIL_SIGNIN",
         "email": email,
         "canHandleCodeInApp": True,
+        "continueUrl": "https://dockcampus.sudelca.com/login",
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(url, json=payload)
