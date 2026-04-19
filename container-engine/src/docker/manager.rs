@@ -32,7 +32,7 @@ impl DockerManager {
         cpu_limit: f64,
     ) -> Result<String> {
         let container_name = format!("dockcampus-student-{}", user_id);
-        let port_str = format!("{}/tcp", port);
+        let port_str = "8080/tcp".to_string();
         let host_port = port.to_string();
 
         let mut port_bindings: HashMap<String, Option<Vec<PortBinding>>> = HashMap::new();
@@ -45,7 +45,7 @@ impl DockerManager {
         );
 
         let mut exposed_ports: HashMap<&str, HashMap<(), ()>> = HashMap::new();
-        exposed_ports.insert(Box::leak(port_str.into_boxed_str()), HashMap::new());
+        exposed_ports.insert("8080/tcp", HashMap::new());
 
         let memory_bytes = (memory_limit_mb as i64) * 1024 * 1024;
         let cpu_quota = (cpu_limit * 100_000.0) as i64;
@@ -71,6 +71,7 @@ impl DockerManager {
                 Box::leak(format!("CODER_USER_ID={}", user_id).into_boxed_str()),
             ]),
             host_config: Some(host_config),
+            exposed_ports: Some(exposed_ports),
             ..Default::default()
         };
 
