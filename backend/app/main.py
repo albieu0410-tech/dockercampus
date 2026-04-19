@@ -17,6 +17,7 @@ app = FastAPI(
     description="Gateway between the frontend and the Rust container engine",
     version="0.1.0",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 app.add_middleware(

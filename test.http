@@ -1,4 +1,4 @@
-@baseUrl = http://api.sudelca.com
+@baseUrl = https://api.sudelca.com
 @email = 123@example.com
 @password = 123
 @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3ODY4MGJkNi1lZjZjLTQ2YWMtODA3OC04ZTQ4NWZjNDEzMWEiLCJleHAiOjE3NzY1NjQ5NDJ9.8uCZpWFO-NMVPdl1irijtG76sxZm8lDULtTHm4ulI24
