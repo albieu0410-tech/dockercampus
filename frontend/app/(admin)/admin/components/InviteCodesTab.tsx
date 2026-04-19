@@ -90,49 +90,51 @@ export default function InviteCodesTab() {
         </div>
       ) : (
         <div className="card rounded-lg overflow-hidden glow">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-800 text-zinc-500 text-xs">
-                <th className="text-left px-4 py-3">Code</th>
-                <th className="text-left px-4 py-3">Role</th>
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">Expires</th>
-                <th className="text-left px-4 py-3">Created</th>
-                <th className="text-left px-4 py-3">Copy</th>
-              </tr>
-            </thead>
-            <tbody>
-              {codes.map((c) => (
-                <tr key={c.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50 transition-colors">
-                  <td className="px-4 py-3">
-                    <span className="font-mono text-orange-400 text-xs bg-orange-500/10 px-2 py-1 rounded">{c.code}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded badge-${c.role}`}>{c.role}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded badge-${c.is_used ? "used" : "unused"}`}>
-                      {c.is_used ? "used" : "available"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500 text-xs">
-                    {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "Never"}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500 text-xs">{new Date(c.created_at).toLocaleDateString()}</td>
-                  <td className="px-4 py-3">
-                    {!c.is_used && (
-                      <button
-                        onClick={() => copyCode(c.code)}
-                        className="text-xs px-3 py-1 rounded border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-500 transition-colors"
-                      >
-                        {copied === c.code ? "✓ Copied" : "Copy"}
-                      </button>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
+              <thead>
+                <tr className="border-b border-zinc-800 text-zinc-500 text-xs">
+                  <th className="text-left px-4 py-3">Code</th>
+                  <th className="text-left px-4 py-3">Role</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-left px-4 py-3">Expires</th>
+                  <th className="text-left px-4 py-3">Created</th>
+                  <th className="text-left px-4 py-3">Copy</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {codes.map((c) => (
+                  <tr key={c.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50 transition-colors">
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-orange-400 text-xs bg-orange-500/10 px-2 py-1 rounded">{c.code}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-1 rounded badge-${c.role}`}>{c.role}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-1 rounded badge-${c.is_used ? "used" : "unused"}`}>
+                        {c.is_used ? "used" : "available"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-zinc-500 text-xs">
+                      {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "Never"}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-500 text-xs">{new Date(c.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3">
+                      {!c.is_used && (
+                        <button
+                          onClick={() => copyCode(c.code)}
+                          className="text-xs px-3 py-1 rounded border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-500 transition-colors"
+                        >
+                          {copied === c.code ? "✓ Copied" : "Copy"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {codes.length === 0 && <div className="text-center py-12 text-zinc-600 text-sm">No invite codes yet</div>}
         </div>
       )}

@@ -22,12 +22,11 @@ export default function AdminPage() {
       .catch(() => router.push("/login"));
   }, [router]);
 
-  if (!ready)
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+  if (!ready) return (
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: "users", label: "Users", icon: "⬡" },
@@ -39,15 +38,8 @@ export default function AdminPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Syne:wght@700;800&display=swap');
-
-        .tab-active {
-          background: linear-gradient(135deg, #f97316, #ea580c);
-          color: #fff;
-        }
-        .card {
-          background: #18181b;
-          border: 1px solid #27272a;
-        }
+        .tab-active { background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; }
+        .card { background: #18181b; border: 1px solid #27272a; }
         .badge-student { background: #1d4ed820; color: #60a5fa; border: 1px solid #1d4ed840; }
         .badge-professor { background: #7c3aed20; color: #a78bfa; border: 1px solid #7c3aed40; }
         .badge-admin { background: #dc262620; color: #f87171; border: 1px solid #dc262640; }
@@ -72,29 +64,40 @@ export default function AdminPage() {
         ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 2px; }
       `}</style>
 
-      <div className="border-b border-zinc-800 px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-8 h-8 bg-orange-500 rounded flex items-center justify-center text-white font-bold text-sm">D</div>
+      {/* Header */}
+      <div className="border-b border-zinc-800 px-4 sm:px-8 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-orange-500 rounded flex items-center justify-center text-white font-bold text-sm shrink-0">D</div>
           <div>
-            <div style={{ fontFamily: "'Syne', sans-serif" }} className="text-lg font-800 tracking-tight">
+            <div style={{ fontFamily: "'Syne', sans-serif" }} className="text-base sm:text-lg font-800 tracking-tight">
               DockCampus <span className="text-orange-500">Admin</span>
             </div>
-            <div className="text-xs text-zinc-500">Control Panel</div>
+            <div className="text-xs text-zinc-500 hidden sm:block">Control Panel</div>
           </div>
         </div>
-        <button
-          onClick={() => {
-            document.cookie = "token=; Max-Age=0";
-            router.push("/login");
-          }}
-          className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1.5 border border-zinc-800 rounded hover:border-zinc-600"
-        >
-          Sign out
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Mobile tab selector */}
+          <select
+            className="sm:hidden text-xs rounded px-2 py-1.5"
+            value={tab}
+            onChange={(e) => setTab(e.target.value as Tab)}
+          >
+            {tabs.map((t) => (
+              <option key={t.key} value={t.key}>{t.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => { document.cookie = "token=; Max-Age=0"; router.push("/login"); }}
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1.5 border border-zinc-800 rounded hover:border-zinc-600"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
 
       <div className="flex">
-        <div className="w-52 min-h-[calc(100vh-57px)] border-r border-zinc-800 p-4 flex flex-col gap-1">
+        {/* Sidebar — hidden on mobile */}
+        <div className="hidden sm:flex w-52 min-h-[calc(100vh-57px)] border-r border-zinc-800 p-4 flex-col gap-1 shrink-0">
           {tabs.map((t) => (
             <button
               key={t.key}
@@ -116,7 +119,8 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="flex-1 p-8">
+        {/* Main content */}
+        <div className="flex-1 min-w-0 p-4 sm:p-8">
           {tab === "users" && <UsersTab />}
           {tab === "invites" && <InviteCodesTab />}
           {tab === "containers" && <ContainersTab />}

@@ -83,63 +83,65 @@ export default function UsersTab() {
         </div>
       ) : (
         <div className="card rounded-lg overflow-hidden glow">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-800 text-zinc-500 text-xs">
-                <th className="text-left px-4 py-3">Name</th>
-                <th className="text-left px-4 py-3">Email</th>
-                <th className="text-left px-4 py-3">Role</th>
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">Verified</th>
-                <th className="text-left px-4 py-3">Joined</th>
-                <th className="text-left px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((user) => (
-                <tr key={user.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50 transition-colors">
-                  <td className="px-4 py-3 font-medium">{user.full_name}</td>
-                  <td className="px-4 py-3 text-zinc-400">{user.email}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={user.role}
-                      onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                      disabled={updating === user.id}
-                      className={`text-xs rounded px-2 py-1 badge-${user.role}`}
-                    >
-                      <option value="student">student</option>
-                      <option value="professor">professor</option>
-                      <option value="admin">admin</option>
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded badge-${user.is_active ? "active" : "inactive"}`}>
-                      {user.is_active ? "active" : "disabled"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded ${user.is_verified ? "badge-active" : "badge-inactive"}`}>
-                      {user.is_verified ? "✓ yes" : "✗ no"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500 text-xs">{new Date(user.created_at).toLocaleDateString()}</td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleToggleActive(user.id, user.is_active)}
-                      disabled={updating === user.id}
-                      className={`text-xs px-3 py-1 rounded border transition-colors ${
-                        user.is_active
-                          ? "border-red-800 text-red-400 hover:bg-red-900/20"
-                          : "border-green-800 text-green-400 hover:bg-green-900/20"
-                      } disabled:opacity-40`}
-                    >
-                      {updating === user.id ? "..." : user.is_active ? "Disable" : "Enable"}
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[700px]">
+              <thead>
+                <tr className="border-b border-zinc-800 text-zinc-500 text-xs">
+                  <th className="text-left px-4 py-3">Name</th>
+                  <th className="text-left px-4 py-3">Email</th>
+                  <th className="text-left px-4 py-3">Role</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-left px-4 py-3">Verified</th>
+                  <th className="text-left px-4 py-3">Joined</th>
+                  <th className="text-left px-4 py-3">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((user) => (
+                  <tr key={user.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50 transition-colors">
+                    <td className="px-4 py-3 font-medium">{user.full_name}</td>
+                    <td className="px-4 py-3 text-zinc-400">{user.email}</td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={user.role}
+                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                        disabled={updating === user.id}
+                        className={`text-xs rounded px-2 py-1 badge-${user.role}`}
+                      >
+                        <option value="student">student</option>
+                        <option value="professor">professor</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-1 rounded badge-${user.is_active ? "active" : "inactive"}`}>
+                        {user.is_active ? "active" : "disabled"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-1 rounded ${user.is_verified ? "badge-active" : "badge-inactive"}`}>
+                        {user.is_verified ? "✓ yes" : "✗ no"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-zinc-500 text-xs">{new Date(user.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleToggleActive(user.id, user.is_active)}
+                        disabled={updating === user.id}
+                        className={`text-xs px-3 py-1 rounded border transition-colors ${
+                          user.is_active
+                            ? "border-red-800 text-red-400 hover:bg-red-900/20"
+                            : "border-green-800 text-green-400 hover:bg-green-900/20"
+                        } disabled:opacity-40`}
+                      >
+                        {updating === user.id ? "..." : user.is_active ? "Disable" : "Enable"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {filtered.length === 0 && <div className="text-center py-12 text-zinc-600 text-sm">No users found</div>}
         </div>
       )}

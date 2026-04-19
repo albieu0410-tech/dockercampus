@@ -67,40 +67,42 @@ export default function ContainersTab() {
         </div>
       ) : (
         <div className="card rounded-lg overflow-hidden glow">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-800 text-zinc-500 text-xs">
-                <th className="text-left px-4 py-3">Name</th>
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">Container ID</th>
-                <th className="text-left px-4 py-3">Owner</th>
-                <th className="text-left px-4 py-3">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {containers.map((c) => {
-                const containerId = c.rust_container_id ?? c.docker_container_id ?? "-";
-                const owner = c.owner_id ?? c.user_id ?? "-";
-                return (
-                  <tr key={c.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50 transition-colors">
-                    <td className="px-4 py-3 font-medium">{c.name ?? "Environment"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded ${statusColor[c.status] ?? "badge-inactive"}`}>{c.status}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs text-zinc-500">
-                        {containerId !== "-" ? `${containerId.slice(0, 12)}...` : "-"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-500 text-xs font-mono">
-                      {owner !== "-" ? `${owner.slice(0, 8)}...` : "-"}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-500 text-xs">{new Date(c.created_at).toLocaleDateString()}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
+              <thead>
+                <tr className="border-b border-zinc-800 text-zinc-500 text-xs">
+                  <th className="text-left px-4 py-3">Name</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-left px-4 py-3">Container ID</th>
+                  <th className="text-left px-4 py-3">Owner</th>
+                  <th className="text-left px-4 py-3">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {containers.map((c) => {
+                  const containerId = c.rust_container_id ?? c.docker_container_id ?? "-";
+                  const owner = c.owner_id ?? c.user_id ?? "-";
+                  return (
+                    <tr key={c.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50 transition-colors">
+                      <td className="px-4 py-3 font-medium">{c.name ?? "Environment"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-1 rounded ${statusColor[c.status] ?? "badge-inactive"}`}>{c.status}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-xs text-zinc-500">
+                          {containerId !== "-" ? `${containerId.slice(0, 12)}...` : "-"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500 text-xs font-mono">
+                        {owner !== "-" ? `${owner.slice(0, 8)}...` : "-"}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500 text-xs">{new Date(c.created_at).toLocaleDateString()}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           {containers.length === 0 && <div className="text-center py-12 text-zinc-600 text-sm">No containers yet</div>}
         </div>
       )}
