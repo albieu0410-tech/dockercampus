@@ -3,6 +3,8 @@ services:
     image: nginx:alpine
     container_name: dockcampus-nginx
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "80:80"
     volumes:
@@ -16,10 +18,8 @@ services:
     image: postgres:16
     container_name: dockcampus-db
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: dockcampus
-      POSTGRES_PASSWORD: j303871992
-      POSTGRES_DB: dockcampus
+    env_file:
+      - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -29,9 +29,11 @@ services:
     build: ./container-engine
     container_name: dockcampus-container-engine
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://dockcampus:j303871992@db:5432/dockcampus
-      RUST_LOG: container_engine=debug
+      DATABASE_URL: ${DATABASE_URL_RUST}
+      RUST_LOG: ${RUST_LOG}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
@@ -45,17 +47,8 @@ services:
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://dockcampus:j303871992@db:5432/dockcampus
-      JWT_SECRET: j303871992
-      JWT_ALGORITHM: HS256
-      JWT_EXPIRE_MINUTES: 480
-      CONTAINER_ENGINE_URL: http://container-engine:8001
-      PROFESSOR_EMAIL: humera.noor@gmail.com
-      PROFESSOR_PASSWORD: Pr0fess0r@2026!
-      GITHUB_CLIENT_ID: Ov23li0YdKtBQmy4AHL3
-      GITHUB_CLIENT_SECRET: 40248fca74102f8bb9d04fde518ba2006be2eef4
-      GITHUB_REDIRECT_URI: https://api.sudelca.com/auth/github/callback
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     depends_on:
@@ -63,11 +56,16 @@ services:
       - container-engine
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: dockcampus-frontend
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      NEXT_PUBLIC_API_URL: https://api.sudelca.com
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:
       - "3000:3000"
     depends_on:
