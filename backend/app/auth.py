@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Callable
 
-import firebase_admin
-import httpx
 import os
+import random
+import string
 import uuid
+import resend
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from firebase_admin import credentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy import select
@@ -88,46 +88,31 @@ async def require_professor(current_user: User = Depends(get_current_user)) -> U
     return current_user
 
 
-def _ensure_firebase_initialized() -> None:
-    if firebase_admin._apps:
-        return
-    if not settings.GOOGLE_APPLICATION_CREDENTIALS:
-        raise HTTPException(status_code=500, detail="Missing GOOGLE_APPLICATION_CREDENTIALS")
-    cred = credentials.Certificate(settings.GOOGLE_APPLICATION_CREDENTIALS)
-    firebase_admin.initialize_app(cred)
+def generate_otp() -> str:
+    return "".join(random.choices(string.digits, k=6))
 
 
-async def firebase_send_magic_link(email: str) -> None:
-    _ensure_firebase_initialized()
-    if not settings.FIREBASE_API_KEY:
-        raise HTTPException(status_code=500, detail="Missing FIREBASE_API_KEY")
+def send_otp_email(email: str, otp: str) -> None:
+    if not settings.RESEND_API_KEY:
+        raise HTTPException(status_code=500, detail="Missing RESEND_API_KEY")
 
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={settings.FIREBASE_API_KEY}"
-    payload = {
-        "requestType": "EMAIL_SIGNIN",
-        "email": email,
-        "canHandleCodeInApp": True,
-        "continueUrl": "https://dockcampus.sudelca.com/login",
-    }
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=payload)
-    if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"Firebase magic link failed: {resp.text}")
-
-
-async def firebase_verify_magic_link(email: str, oob_code: str) -> str:
-    _ensure_firebase_initialized()
-    if not settings.FIREBASE_API_KEY:
-        raise HTTPException(status_code=500, detail="Missing FIREBASE_API_KEY")
-
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithEmailLink?key={settings.FIREBASE_API_KEY}"
-    payload = {"email": email, "oobCode": oob_code}
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=payload)
-    if resp.status_code != 200:
-        error_msg = resp.json().get("error", {}).get("message", resp.text)
-        raise HTTPException(status_code=401, detail=f"Magic link verification failed: {error_msg}")
-    local_id = resp.json().get("localId", "")
-    if not local_id:
-        raise HTTPException(status_code=502, detail="Firebase returned no localId")
-    return local_id
+    resend.api_key = settings.RESEND_API_KEY
+    resend.Emails.send(
+        {
+            "from": "DockCampus <noreply@dockcampus.sudelca.com>",
+            "to": email,
+            "subject": "Your DockCampus login code",
+            "html": f"""
+            <div style="font-family: monospace; max-width: 400px; margin: 0 auto; padding: 40px;">
+                <h2 style="color: #f97316;">DockCampus</h2>
+                <p>Your login code is:</p>
+                <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #f97316; padding: 20px; background: #18181b; border-radius: 8px; text-align: center;">
+                    {otp}
+                </div>
+                <p style="color: #71717a; font-size: 12px; margin-top: 20px;">
+                    This code expires in 10 minutes. If you didn't request this, ignore this email.
+                </p>
+            </div>
+            """,
+        }
+    )

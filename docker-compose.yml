@@ -51,8 +51,6 @@ services:
       - .env
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend/firebase-service-account.json:/app/firebase-service-account.json
     depends_on:
       - db
       - container-engine

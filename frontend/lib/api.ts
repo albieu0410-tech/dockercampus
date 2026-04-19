@@ -39,14 +39,14 @@ export async function register(data: {
 }
 
 export async function login(data: { email: string; password: string }) {
-  return request<{ message: string }>("/auth/login", {
+  return request<{ otp_session_id: string; message: string }>("/auth/login", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
-export async function verifyMagicLink(data: { email: string; oob_code: string }) {
-  return request<{ access_token: string; token_type: string }>("/auth/verify-magic-link", {
+export async function verifyOtp(data: { otp_session_id: string; otp_code: string }) {
+  return request<{ access_token: string; token_type: string }>("/auth/verify-otp", {
     method: "POST",
     body: JSON.stringify(data),
   });
