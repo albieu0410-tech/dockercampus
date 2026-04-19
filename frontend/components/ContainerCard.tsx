@@ -33,7 +33,7 @@ export default function ContainerCard({
   }
 
   const isRunning = container.status === "running";
-  const editorUrl = container.editor_url ?? `https://dockcampus.sudelca.com/app/${container.user_id}`;
+  const editorUrl = container.editor_url ?? `https://dockcampus.sudelca.com/app/${container.user_id}/`;
 
   return (
     <div className="bg-card border rounded-xl p-5 space-y-3 shadow-sm">

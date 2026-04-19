@@ -231,10 +231,12 @@ async def proxy_to_container(
                 content=await request.body(),
                 timeout=30,
             )
+            excluded_headers = ["transfer-encoding"]
+            headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
             return StreamingResponse(
                 content=resp.aiter_bytes(),
                 status_code=resp.status_code,
-                headers={k: v for k, v in resp.headers.items() if k.lower() not in ["content-encoding", "transfer-encoding"]},
+                headers=headers,
             )
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail=f"Proxy error: {e}")
