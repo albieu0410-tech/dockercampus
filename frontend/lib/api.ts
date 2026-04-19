@@ -88,7 +88,7 @@ export async function getContainers() {
 }
 
 export async function createContainer(data: { name: string; image: string }) {
-  return request<Container>("/containers/", {
+  return request<Container>("/containers", {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -129,14 +129,14 @@ export async function listRepos() {
 // -- Deployments --------------------------------------------------------------
 
 export async function createDeployment(data: { repo_url: string; custom_port?: number }) {
-  return request<Deployment>("/deployments/", {
+  return request<Deployment>("/deployments", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 export async function listDeployments() {
-  return request<Deployment[]>("/deployments/");
+  return request<Deployment[]>("/deployments");
 }
 
 // -- Types --------------------------------------------------------------------
