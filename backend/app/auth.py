@@ -103,7 +103,11 @@ async def firebase_send_otp(email: str) -> str:
         raise HTTPException(status_code=500, detail="Missing FIREBASE_API_KEY")
 
     url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={settings.FIREBASE_API_KEY}"
-    payload = {"requestType": "EMAIL_SIGNIN", "email": email, "canHandleCodeInApp": False}
+    payload = {
+        "requestType": "EMAIL_SIGNIN",
+        "email": email,
+        "canHandleCodeInApp": True,
+    }
     async with httpx.AsyncClient() as client:
         resp = await client.post(url, json=payload)
     if resp.status_code != 200:
