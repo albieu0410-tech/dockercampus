@@ -61,7 +61,7 @@ export default function Navbar({ user }: { user: User }) {
       {menuOpen && (
         <div className="sm:hidden border-t mt-3 pt-3 pb-2 space-y-1 px-4">
           {navLinks.map((l) => (
-
+            <a
               key={l.href}
               href={l.href}
               className="block py-2 text-sm text-muted-foreground hover:text-foreground"
@@ -70,7 +70,7 @@ export default function Navbar({ user }: { user: User }) {
               {l.label}
             </a>
           ))}
-
+          <a
             href="/profile"
             className="block py-2 text-sm text-muted-foreground hover:text-foreground"
             onClick={() => setMenuOpen(false)}

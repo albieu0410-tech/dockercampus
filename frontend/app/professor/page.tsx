@@ -325,7 +325,7 @@ export default function ProfessorPage() {
                     </span>
                   </div>
                   {d.public_url && (
-
+                    <a
                       href={d.public_url}
                       target="_blank"
                       rel="noopener noreferrer"
