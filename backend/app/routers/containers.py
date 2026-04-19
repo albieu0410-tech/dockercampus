@@ -32,7 +32,7 @@ def _serialize_container(container: Container) -> dict:
     }
 
 
-@router.get("/", response_model=list[ContainerOut])
+@router.get("", response_model=list[ContainerOut])
 async def list_containers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
