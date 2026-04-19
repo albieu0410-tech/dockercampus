@@ -41,7 +41,7 @@ export async function register(data: {
 }
 
 export async function login(data: { email: string; password: string }) {
-  return request<{ otp_session_id: string; message: string }>("/auth/login", {
+  return request<{ access_token?: string; otp_session_id?: string; message?: string }>("/auth/login", {
     method: "POST",
     body: JSON.stringify(data),
   });

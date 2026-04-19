@@ -76,6 +76,10 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
 
+    if user.is_verified:
+        token = create_access_token({"sub": str(user.id)})
+        return LoginResponse(access_token=token)
+
     otp = generate_otp()
     send_otp_email(user.email, otp)
 
@@ -92,7 +96,10 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(otp_session)
 
-    return LoginResponse(otp_session_id=otp_session.id)
+    return LoginResponse(
+        otp_session_id=otp_session.id,
+        message="Check your email for a 6-digit code.",
+    )
 
 
 @router.post("/verify-otp", response_model=TokenResponse)

@@ -22,8 +22,17 @@ function LoginForm() {
     setLoading(true);
     setError("");
     try {
-      const { otp_session_id } = await login({ email, password });
-      setOtpSessionId(otp_session_id);
+      const res = await login({ email, password });
+      if (res.access_token) {
+        saveToken(res.access_token);
+        document.cookie = `token=${res.access_token}; path=/`;
+        const me = await getMe();
+        router.push(me.role === "professor" ? "/professor" : me.role === "admin" ? "/admin" : "/dashboard");
+      } else if (res.otp_session_id) {
+        setOtpSessionId(res.otp_session_id);
+      } else {
+        setError("Login failed. Please try again.");
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {

@@ -23,8 +23,9 @@ class TokenResponse(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    otp_session_id: uuid.UUID
-    message: str = "Check your email for a 6-digit code."
+    access_token: Optional[str] = None
+    otp_session_id: Optional[uuid.UUID] = None
+    message: Optional[str] = None
 
 
 class VerifyOTPRequest(BaseModel):
