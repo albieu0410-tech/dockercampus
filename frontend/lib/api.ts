@@ -62,6 +62,17 @@ export async function listUsers() {
   return request<User[]>("/users/");
 }
 
+export async function getUsers() {
+  return request<AdminUser[]>("/users");
+}
+
+export async function updateUser(userId: string, data: { role?: string; is_active?: boolean }) {
+  return request<AdminUser>(`/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function listStudents() {
   return request<User[]>("/users/students");
 }
@@ -70,6 +81,10 @@ export async function listStudents() {
 
 export async function listContainers() {
   return request<Container[]>("/containers/");
+}
+
+export async function getContainers() {
+  return request<AdminContainer[]>("/containers");
 }
 
 export async function createContainer(data: { name: string; image: string }) {
@@ -96,6 +111,17 @@ export async function getGithubStatus() {
   return request<GithubConnection | null>("/auth/github/status");
 }
 
+export async function getInviteCodes() {
+  return request<InviteCode[]>("/auth/invite-codes");
+}
+
+export async function createInviteCode(data: { role: string }) {
+  return request<InviteCode>("/auth/invite-codes", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function listRepos() {
   return request<Repo[]>("/auth/github/repos");
 }
@@ -116,12 +142,13 @@ export async function listDeployments() {
 // -- Types --------------------------------------------------------------------
 
 export type User = {
-  id: number;
+  id: number | string;
   email: string;
   full_name: string;
-  role: "student" | "professor";
+  role: "student" | "professor" | "admin";
   is_active: boolean;
   created_at: string;
+  is_verified?: boolean;
 };
 
 export type Container = {
@@ -165,5 +192,35 @@ export type Deployment = {
   status: string;
   build_logs: string | null;
   public_url: string | null;
+  created_at: string;
+};
+
+export type AdminUser = {
+  id: string;
+  email: string;
+  full_name: string;
+  role: "student" | "professor" | "admin";
+  is_verified: boolean;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type InviteCode = {
+  id: string;
+  code: string;
+  role: "student" | "professor";
+  is_used: boolean;
+  expires_at: string | null;
+  created_at: string;
+};
+
+export type AdminContainer = {
+  id: string;
+  name?: string;
+  status: string;
+  rust_container_id?: string;
+  docker_container_id?: string | null;
+  owner_id?: string;
+  user_id?: string;
   created_at: string;
 };
