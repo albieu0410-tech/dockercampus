@@ -44,11 +44,13 @@ services:
     container_name: dockcampus-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL_PYTHON: postgresql+psycopg2://dockcampus:j303871992@db:5432/dockcampus
-      JWT_SECRET: Ch@ngeMeT0S0methingL0ng@ndR@ndom2026!
+      DATABASE_URL: postgresql+asyncpg://dockcampus:j303871992@db:5432/dockcampus
+      JWT_SECRET: j303871992
       JWT_ALGORITHM: HS256
       JWT_EXPIRE_MINUTES: 480
       CONTAINER_ENGINE_URL: http://container-engine:8001
+      PROFESSOR_EMAIL: humera.noor@gmail.com
+      PROFESSOR_PASSWORD: Pr0fess0r@2026!
     ports:
       - "8000:8000"
     depends_on:
@@ -60,7 +62,7 @@ services:
     container_name: dockcampus-frontend
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: https://dockcampus.sudelca.com/api
+      NEXT_PUBLIC_API_URL: https://api.sudelca.com
     ports:
       - "3000:3000"
     depends_on:
