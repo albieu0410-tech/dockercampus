@@ -126,6 +126,32 @@ impl DockerManager {
         Ok(())
     }
 
+    pub async fn exec_command(&self, container_id: &str, command: &str) -> Result<String> {
+        use bollard::exec::{CreateExecOptions, StartExecResults};
+        use futures_util::StreamExt;
+
+        let exec = self.client.create_exec(
+            container_id,
+            CreateExecOptions {
+                cmd: Some(vec!["sh", "-c", command]),
+                attach_stdout: Some(true),
+                attach_stderr: Some(true),
+                ..Default::default()
+            },
+        ).await?;
+
+        let mut output = String::new();
+        if let StartExecResults::Attached { output: mut stream, .. } =
+            self.client.start_exec(&exec.id, None).await?
+        {
+            while let Some(Ok(msg)) = stream.next().await {
+                output.push_str(&msg.to_string());
+            }
+        }
+
+        Ok(output)
+    }
+
     pub async fn get_container_stats(&self, container_id: &str) -> Result<ContainerStats> {
         let mut stream = self.client.stats(
             container_id,

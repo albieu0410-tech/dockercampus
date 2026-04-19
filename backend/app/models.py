@@ -53,3 +53,36 @@ class Container(Base):
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     owner: Mapped["User"] = relationship("User", back_populates="containers")
+
+
+class GithubConnection(Base):
+    __tablename__ = "github_connections"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, unique=True)
+    github_username: Mapped[str] = mapped_column(String(255), nullable=False)
+    github_access_token: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    owner: Mapped["User"] = relationship("User")
+
+
+class Deployment(Base):
+    __tablename__ = "deployments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    container_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("containers.id"), nullable=False)
+    repo_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    github_token: Mapped[str] = mapped_column(String, nullable=True)
+    detected_port: Mapped[int] = mapped_column(Integer, nullable=True)
+    custom_port: Mapped[int] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
+    build_logs: Mapped[str] = mapped_column(String, nullable=True)
+    public_url: Mapped[str] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    owner: Mapped["User"] = relationship("User")
+    container: Mapped["Container"] = relationship("Container")

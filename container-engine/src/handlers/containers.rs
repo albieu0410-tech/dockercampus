@@ -26,10 +26,16 @@ pub struct CreateContainerResponse {
     pub editor_url: String,
 }
 
+#[derive(Deserialize)]
+pub struct ExecRequest {
+    pub command: String,
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(list_containers))
         .route("/create", post(create_container))
+        .route("/:user_id/exec", post(exec_in_container))
         .route("/:user_id/start", post(start_container))
         .route("/:user_id/stop", post(stop_container))
         .route("/:user_id/delete", delete(delete_container))
@@ -220,5 +226,29 @@ async fn get_container_stats(
         "memory_usage_mb": stats.memory_usage_mb,
         "memory_limit_mb": stats.memory_limit_mb,
         "status": format!("{:?}", stats.status)
+    })))
+}
+
+async fn exec_in_container(
+    State(state): State<Arc<AppState>>,
+    Path(user_id): Path<Uuid>,
+    Json(payload): Json<ExecRequest>,
+) -> Result<Json<serde_json::Value>> {
+    let container = sqlx::query!(
+        "SELECT docker_container_id FROM containers WHERE user_id = $1",
+        user_id
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("Container for user {} not found", user_id)))?;
+
+    let docker_id = container.docker_container_id
+        .ok_or_else(|| AppError::NotFound("Docker container ID not set".to_string()))?;
+
+    let output = state.docker.exec_command(&docker_id, &payload.command).await?;
+
+    Ok(Json(serde_json::json!({
+        "output": output,
+        "success": true
     })))
 }

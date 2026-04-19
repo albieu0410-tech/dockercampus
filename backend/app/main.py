@@ -1,9 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-
 from app.database import engine, Base
-from app.routers import auth, users, containers
+from app.routers import auth, users, containers, github, deployments
 
 
 @asynccontextmanager
@@ -31,6 +30,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(containers.router)
+app.include_router(github.router)
+app.include_router(deployments.router)
 
 
 @app.get("/health")

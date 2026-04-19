@@ -53,3 +53,27 @@ class ContainerOut(BaseModel):
 
 class ContainerAction(BaseModel):
     action: str  # "start" | "stop" | "restart"
+
+
+class GithubConnectionOut(BaseModel):
+    id: uuid.UUID
+    github_username: str
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class DeploymentCreate(BaseModel):
+    repo_url: str
+    custom_port: int | None = None
+
+
+class DeploymentOut(BaseModel):
+    id: uuid.UUID
+    repo_url: str
+    detected_port: int | None
+    custom_port: int | None
+    status: str
+    build_logs: str | None
+    public_url: str | None
+    created_at: datetime
+    model_config = {"from_attributes": True}

@@ -1,0 +1,23 @@
+@baseUrl = http://api.sudelca.com
+@email = 123@example.com
+@password = 123
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3ODY4MGJkNi1lZjZjLTQ2YWMtODA3OC04ZTQ4NWZjNDEzMWEiLCJleHAiOjE3NzY1NjQ5NDJ9.8uCZpWFO-NMVPdl1irijtG76sxZm8lDULtTHm4ulI24
+
+### Login (copy access_token from response)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Create container (uses manual token variable)
+POST {{baseUrl}}/containers/
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "test",
+  "image": "python:3.12"
+}
