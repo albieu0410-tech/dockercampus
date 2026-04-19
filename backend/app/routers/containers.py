@@ -2,6 +2,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 import os
 
 from app.database import get_db
@@ -59,18 +60,30 @@ async def create_container(
 
     rust_data = resp.json()
 
-    new_container = Container(
-        user_id=current_user.id,
-        docker_container_id=rust_data["container_id"],
-        port=rust_data["port"],
-        status=ContainerStatus.running,
-        cpu_limit=0.5,
-        memory_limit_mb=512,
-    )
-    db.add(new_container)
-    await db.commit()
-    await db.refresh(new_container)
-    return new_container
+    try:
+        new_container = Container(
+            user_id=current_user.id,
+            docker_container_id=rust_data["container_id"],
+            port=rust_data["port"],
+            status=ContainerStatus.running,
+            cpu_limit=0.5,
+            memory_limit_mb=512,
+        )
+        db.add(new_container)
+        await db.commit()
+        await db.refresh(new_container)
+        return new_container
+    except IntegrityError:
+        await db.rollback()
+        result = await db.execute(
+            select(Container).where(
+                Container.docker_container_id == rust_data["container_id"]
+            )
+        )
+        existing = result.scalar_one_or_none()
+        if existing:
+            return existing
+        raise HTTPException(status_code=500, detail="Failed to save container")
 
 
 @router.post("/{container_id}/action")
