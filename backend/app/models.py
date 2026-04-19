@@ -12,6 +12,7 @@ import uuid
 class UserRole(str, enum.Enum):
     student = "student"
     professor = "professor"
+    admin = "admin"
 
 
 class ContainerStatus(str, enum.Enum):
