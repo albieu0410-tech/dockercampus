@@ -218,7 +218,7 @@ async def proxy_to_container(
     if container.status != "running":
         raise HTTPException(status_code=503, detail="Container is not running")
 
-    target_url = f"http://localhost:{container.port}/{path}"
+    target_url = f"http://host.docker.internal:{container.port}/{path}"
     if request.url.query:
         target_url += f"?{request.url.query}"
 
