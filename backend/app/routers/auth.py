@@ -1,26 +1,25 @@
 import secrets
-import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import (
     hash_password,
     verify_password,
     create_access_token,
-    firebase_send_otp,
-    firebase_verify_otp,
+    firebase_send_magic_link,
+    firebase_verify_magic_link,
     require_role,
 )
 from app.database import get_db
-from app.models import User, InviteCode, OTPSession
+from app.models import User, InviteCode
 from app.schemas import (
     RegisterRequest,
     LoginRequest,
     LoginResponse,
-    VerifyOTPRequest,
+    VerifyMagicLinkRequest,
     TokenResponse,
     UserOut,
     InviteCodeCreate,
@@ -28,10 +27,6 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-OTP_SESSION_TTL_MINUTES = 10
-MAX_OTP_ATTEMPTS = 5
-
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
@@ -79,63 +74,23 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
 
-    session_info = await firebase_send_otp(user.email)
-
-    await db.execute(delete(OTPSession).where(OTPSession.user_id == user.id))
-
-    otp_session = OTPSession(
-        user_id=user.id,
-        firebase_session_info=session_info,
-        expires_at=datetime.utcnow() + timedelta(minutes=OTP_SESSION_TTL_MINUTES),
-    )
-    db.add(otp_session)
-    await db.commit()
-    await db.refresh(otp_session)
-
-    return LoginResponse(otp_session_id=otp_session.id)
+    await firebase_send_magic_link(user.email)
+    return LoginResponse()
 
 
-@router.post("/verify-otp", response_model=TokenResponse)
-async def verify_otp(body: VerifyOTPRequest, db: AsyncSession = Depends(get_db)):
-    session_result = await db.execute(
-        select(OTPSession).where(OTPSession.id == body.otp_session_id)
-    )
-    session = session_result.scalar_one_or_none()
-    if not session:
-        raise HTTPException(status_code=404, detail="OTP session not found")
-
-    if session.expires_at < datetime.utcnow():
-        await db.delete(session)
-        await db.commit()
-        raise HTTPException(status_code=410, detail="OTP expired. Please log in again.")
-
-    if session.attempts >= MAX_OTP_ATTEMPTS:
-        await db.delete(session)
-        await db.commit()
-        raise HTTPException(status_code=429, detail="Too many attempts. Please log in again.")
-
-    user_result = await db.execute(select(User).where(User.id == session.user_id))
+@router.post("/verify-magic-link", response_model=TokenResponse)
+async def verify_magic_link(body: VerifyMagicLinkRequest, db: AsyncSession = Depends(get_db)):
+    user_result = await db.execute(select(User).where(User.email == body.email))
     user = user_result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    try:
-        firebase_uid = await firebase_verify_otp(
-            session.firebase_session_info,
-            body.otp_code,
-            user.email,
-        )
-    except HTTPException:
-        session.attempts += 1
-        await db.commit()
-        remaining = MAX_OTP_ATTEMPTS - session.attempts
-        raise HTTPException(status_code=401, detail=f"Invalid OTP. {remaining} attempt(s) remaining.")
+    firebase_uid = await firebase_verify_magic_link(body.email, body.oob_code)
 
     if not user.is_verified:
         user.is_verified = True
         user.firebase_uid = firebase_uid
 
-    await db.delete(session)
     await db.commit()
 
     token = create_access_token({"sub": str(user.id)})

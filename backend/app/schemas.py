@@ -23,13 +23,12 @@ class TokenResponse(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    otp_session_id: uuid.UUID
-    message: str = "OTP sent to your email. Submit it to complete login."
+    message: str = "Magic link sent to your email. Click the link to sign in."
 
 
-class VerifyOTPRequest(BaseModel):
-    otp_session_id: uuid.UUID
-    otp_code: str
+class VerifyMagicLinkRequest(BaseModel):
+    email: str
+    oob_code: str
 
 
 class UserOut(BaseModel):

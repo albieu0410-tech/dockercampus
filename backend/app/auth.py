@@ -97,7 +97,7 @@ def _ensure_firebase_initialized() -> None:
     firebase_admin.initialize_app(cred)
 
 
-async def firebase_send_otp(email: str) -> str:
+async def firebase_send_magic_link(email: str) -> None:
     _ensure_firebase_initialized()
     if not settings.FIREBASE_API_KEY:
         raise HTTPException(status_code=500, detail="Missing FIREBASE_API_KEY")
@@ -112,25 +112,21 @@ async def firebase_send_otp(email: str) -> str:
     async with httpx.AsyncClient() as client:
         resp = await client.post(url, json=payload)
     if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"Firebase OTP send failed: {resp.text}")
-    session_info = resp.json().get("sessionInfo", "")
-    if not session_info:
-        raise HTTPException(status_code=502, detail="Firebase returned no sessionInfo")
-    return session_info
+        raise HTTPException(status_code=502, detail=f"Firebase magic link failed: {resp.text}")
 
 
-async def firebase_verify_otp(session_info: str, otp_code: str, email: str) -> str:
+async def firebase_verify_magic_link(email: str, oob_code: str) -> str:
     _ensure_firebase_initialized()
     if not settings.FIREBASE_API_KEY:
         raise HTTPException(status_code=500, detail="Missing FIREBASE_API_KEY")
 
     url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithEmailLink?key={settings.FIREBASE_API_KEY}"
-    payload = {"email": email, "oobCode": otp_code, "sessionInfo": session_info}
+    payload = {"email": email, "oobCode": oob_code}
     async with httpx.AsyncClient() as client:
         resp = await client.post(url, json=payload)
     if resp.status_code != 200:
         error_msg = resp.json().get("error", {}).get("message", resp.text)
-        raise HTTPException(status_code=401, detail=f"OTP verification failed: {error_msg}")
+        raise HTTPException(status_code=401, detail=f"Magic link verification failed: {error_msg}")
     local_id = resp.json().get("localId", "")
     if not local_id:
         raise HTTPException(status_code=502, detail="Firebase returned no localId")
