@@ -1,10 +1,12 @@
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from fastapi.responses import StreamingResponse
+from starlette.websockets import WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 import os
+import websockets
 
 from app.database import get_db
 from app.models import User, Container, ContainerStatus
@@ -240,3 +242,52 @@ async def proxy_to_container(
             )
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail=f"Proxy error: {e}")
+
+
+@router.websocket("/app/{user_id}/{path:path}")
+async def proxy_websocket(
+    websocket: WebSocket,
+    user_id: str,
+    path: str,
+    db: AsyncSession = Depends(get_db),
+):
+    import uuid as uuid_module
+    try:
+        uid = uuid_module.UUID(user_id)
+    except ValueError:
+        await websocket.close(code=4000)
+        return
+
+    result = await db.execute(
+        select(Container).where(Container.user_id == uid)
+    )
+    container = result.scalar_one_or_none()
+    if not container:
+        await websocket.close(code=4004)
+        return
+
+    await websocket.accept()
+
+    target_url = f"ws://host.docker.internal:{container.port}/{path}"
+    if websocket.url.query:
+        target_url += f"?{websocket.url.query}"
+
+    try:
+        async with websockets.connect(target_url) as ws:
+            async def forward():
+                async for message in websocket.iter_bytes():
+                    await ws.send(message)
+
+            async def backward():
+                async for message in ws:
+                    if isinstance(message, bytes):
+                        await websocket.send_bytes(message)
+                    else:
+                        await websocket.send_text(message)
+
+            import asyncio
+            await asyncio.gather(forward(), backward())
+    except WebSocketDisconnect:
+        return
+    except Exception:
+        await websocket.close()

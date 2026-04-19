@@ -62,6 +62,7 @@ impl DockerManager {
             binds: Some(vec![
                 format!("dockcampus-workspace-{}:/home/coder/workspace", user_id)
             ]),
+            network_mode: Some("dockcampus_default".to_string()),
             ..Default::default()
         };
 
