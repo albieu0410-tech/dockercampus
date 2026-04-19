@@ -178,47 +178,63 @@ async def delete_container(
 
 
 @router.get("/proxy-info/{user_id}")
-async def get_proxy_info(user_id: str, db: AsyncSession = Depends(get_db)):
+async def get_proxy_info(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    import uuid as uuid_module
+    try:
+        uid = uuid_module.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user ID")
     result = await db.execute(
-        select(Container).where(Container.user_id == user_id)
+        select(Container).where(Container.user_id == uid)
     )
     container = result.scalar_one_or_none()
-    if not container or container.status != ContainerStatus.running:
-        raise HTTPException(status_code=404, detail="No running container")
-    return {"port": container.port}
+    if not container:
+        raise HTTPException(status_code=404, detail="No container found")
+    return {"port": container.port, "status": container.status}
 
 
-@router.api_route(
-    "/app/{user_id}/{path:path}",
-    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-)
+@router.api_route("/app/{user_id}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
 async def proxy_to_container(
     user_id: str,
     path: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    import uuid as uuid_module
+    try:
+        uid = uuid_module.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+
     result = await db.execute(
-        select(Container).where(Container.user_id == user_id)
+        select(Container).where(Container.user_id == uid)
     )
     container = result.scalar_one_or_none()
     if not container:
         raise HTTPException(status_code=404, detail="Container not found")
+    if container.status != "running":
+        raise HTTPException(status_code=503, detail="Container is not running")
 
     target_url = f"http://localhost:{container.port}/{path}"
-    headers = dict(request.headers)
-    headers.pop("host", None)
+    if request.query_string:
+        target_url += f"?{request.query_string.decode()}"
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.request(
-            method=request.method,
-            url=target_url,
-            headers=headers,
-            content=await request.body(),
-            timeout=30,
-        )
-        return StreamingResponse(
-            resp.aiter_bytes(),
-            status_code=resp.status_code,
-            headers=dict(resp.headers),
-        )
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        try:
+            resp = await client.request(
+                method=request.method,
+                url=target_url,
+                headers={k: v for k, v in request.headers.items() if k.lower() not in ["host", "content-length"]},
+                content=await request.body(),
+                timeout=30,
+            )
+            return StreamingResponse(
+                content=resp.aiter_bytes(),
+                status_code=resp.status_code,
+                headers={k: v for k, v in resp.headers.items() if k.lower() not in ["content-encoding", "transfer-encoding"]},
+            )
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=502, detail=f"Proxy error: {e}")
