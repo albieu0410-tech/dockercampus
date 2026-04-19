@@ -33,12 +33,28 @@ class VerifyOTPRequest(BaseModel):
     otp_code: str
 
 
+class UpdateProfileRequest(BaseModel):
+    full_name: Optional[str] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class UpdateUserRequest(BaseModel):
+    full_name: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
+
+
 class UserOut(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str
     role: UserRole
     is_active: bool
+    is_verified: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

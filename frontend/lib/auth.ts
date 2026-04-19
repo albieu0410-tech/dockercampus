@@ -6,6 +6,10 @@ export function clearToken() {
   localStorage.removeItem("token");
 }
 
+export function removeToken() {
+  clearToken();
+}
+
 export function getToken() {
   return localStorage.getItem("token");
 }

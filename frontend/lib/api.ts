@@ -23,6 +23,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new Error(error.detail || "Request failed");
   }
 
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
   return res.json();
 }
 
@@ -77,6 +81,24 @@ export async function updateUser(userId: string, data: { role?: string; is_activ
 
 export async function listStudents() {
   return request<User[]>("/users/students");
+}
+
+export async function updateProfile(data: { full_name: string }) {
+  return request<User>("/users/me", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function changePassword(data: { current_password: string; new_password: string }) {
+  return request("/users/me/change-password", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteAccount() {
+  return request("/users/me", { method: "DELETE" });
 }
 
 // -- Containers ---------------------------------------------------------------

@@ -16,7 +16,9 @@ export default function Navbar({ user }: { user: User }) {
     <header className="border-b bg-card px-6 py-3 flex items-center justify-between">
       <span className="font-bold text-lg">DockCampus</span>
       <div className="flex items-center gap-4">
-        <span className="text-sm text-muted-foreground">{user.full_name}</span>
+        <a href="/profile" className="text-sm text-muted-foreground hover:underline">
+          {user.full_name}
+        </a>
         <span className="text-xs bg-muted px-2 py-1 rounded-full capitalize">{user.role}</span>
         <button
           onClick={logout}

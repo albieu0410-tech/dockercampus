@@ -1,4 +1,6 @@
 import secrets
+import os
+import re
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -29,9 +31,27 @@ from app.schemas import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 OTP_TTL_MINUTES = 10
 MAX_ATTEMPTS = 5
+ALLOWED_DOMAINS = [d.strip() for d in os.getenv("ALLOWED_EMAIL_DOMAINS", "").split(",") if d.strip()]
+PASSWORD_REGEX = re.compile(
+    r'^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\-=\[\]{};:\'",.<>?/\\|`~]).{8,}$'
+)
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    if ALLOWED_DOMAINS:
+        domain = body.email.split("@")[-1]
+        if domain not in ALLOWED_DOMAINS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Email domain not allowed. Allowed domains: {', '.join(ALLOWED_DOMAINS)}",
+            )
+
+    if not PASSWORD_REGEX.match(body.password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be at least 8 characters and include an uppercase letter, a number, and a special character.",
+        )
+
     invite_result = await db.execute(
         select(InviteCode).where(
             InviteCode.code == body.invite_code,
