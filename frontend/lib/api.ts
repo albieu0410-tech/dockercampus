@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sudelca.com";
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sudelca.com";
+const API_URL = RAW_API_URL.replace(/^http:\/\//, "https://").replace(/\/+$/, "");
 
 function getToken() {
   if (typeof window === "undefined") return null;
@@ -7,7 +8,8 @@ function getToken() {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${API_URL}${path}`, {
+  const normalizedPath = path.length > 1 ? path.replace(/\/+$/, "") : path;
+  const res = await fetch(`${API_URL}${normalizedPath}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
