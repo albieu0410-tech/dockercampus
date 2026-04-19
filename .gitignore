@@ -145,6 +145,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+firebase-service-account.json
+backend/firebase-service-account.json
 
 # Spyder project settings
 .spyderproject
