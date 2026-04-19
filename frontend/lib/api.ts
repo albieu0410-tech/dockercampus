@@ -59,7 +59,7 @@ export async function getMe() {
 }
 
 export async function listUsers() {
-  return request<User[]>("/users/");
+  return request<User[]>("/users");
 }
 
 export async function getUsers() {
@@ -80,7 +80,7 @@ export async function listStudents() {
 // -- Containers ---------------------------------------------------------------
 
 export async function listContainers() {
-  return request<Container[]>("/containers/");
+  return request<Container[]>("/containers");
 }
 
 export async function getContainers() {
