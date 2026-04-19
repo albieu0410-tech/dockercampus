@@ -1,10 +1,31 @@
-FROM codercom/code-server:4.95.3
+FROM codercom/code-server:latest
 
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends git curl && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    nodejs \
+    npm \
+    git \
+    curl \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --break-system-packages \
+    pandas \
+    numpy \
+    requests \
+    fastapi \
+    uvicorn \
+    sqlalchemy \
+    jupyter
 
 USER coder
-WORKDIR /home/coder/project
+
+RUN mkdir -p /home/coder/workspace
+
+WORKDIR /home/coder/workspace
 
 EXPOSE 8080
-CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "--auth", "none", "/home/coder/project"]
