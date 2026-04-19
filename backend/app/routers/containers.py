@@ -28,7 +28,7 @@ def _serialize_container(container: Container) -> dict:
         "memory_limit_mb": container.memory_limit_mb,
         "user_id": container.user_id,
         "created_at": container.created_at,
-        "editor_url": f"https://dockcampus.sudelca.com/app/{container.user_id}",
+        "editor_url": f"https://dockcampus.sudelca.com/app/{container.user_id}/",
     }
 
 
