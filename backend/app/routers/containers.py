@@ -1,5 +1,6 @@
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -15,6 +16,20 @@ router = APIRouter(prefix="/containers", tags=["containers"])
 RUST_SERVICE_URL = os.getenv("CONTAINER_ENGINE_URL", "http://container-engine:8001")
 
 
+def _serialize_container(container: Container) -> dict:
+    return {
+        "id": container.id,
+        "docker_container_id": container.docker_container_id,
+        "port": container.port,
+        "status": container.status,
+        "cpu_limit": container.cpu_limit,
+        "memory_limit_mb": container.memory_limit_mb,
+        "user_id": container.user_id,
+        "created_at": container.created_at,
+        "editor_url": f"https://dockcampus.sudelca.com/app/{container.user_id}",
+    }
+
+
 @router.get("/", response_model=list[ContainerOut])
 async def list_containers(
     db: AsyncSession = Depends(get_db),
@@ -23,7 +38,8 @@ async def list_containers(
     result = await db.execute(
         select(Container).where(Container.user_id == current_user.id)
     )
-    return result.scalars().all()
+    containers = result.scalars().all()
+    return [_serialize_container(container) for container in containers]
 
 
 @router.post("/", response_model=ContainerOut, status_code=201)
@@ -72,7 +88,7 @@ async def create_container(
         db.add(new_container)
         await db.commit()
         await db.refresh(new_container)
-        return new_container
+        return _serialize_container(new_container)
     except IntegrityError:
         await db.rollback()
         result = await db.execute(
@@ -82,7 +98,7 @@ async def create_container(
         )
         existing = result.scalar_one_or_none()
         if existing:
-            return existing
+            return _serialize_container(existing)
         raise HTTPException(status_code=500, detail="Failed to save container")
 
 
@@ -159,3 +175,50 @@ async def delete_container(
 
     await db.delete(container)
     await db.commit()
+
+
+@router.get("/proxy-info/{user_id}")
+async def get_proxy_info(user_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Container).where(Container.user_id == user_id)
+    )
+    container = result.scalar_one_or_none()
+    if not container or container.status != ContainerStatus.running:
+        raise HTTPException(status_code=404, detail="No running container")
+    return {"port": container.port}
+
+
+@router.api_route(
+    "/app/{user_id}/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+)
+async def proxy_to_container(
+    user_id: str,
+    path: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Container).where(Container.user_id == user_id)
+    )
+    container = result.scalar_one_or_none()
+    if not container:
+        raise HTTPException(status_code=404, detail="Container not found")
+
+    target_url = f"http://localhost:{container.port}/{path}"
+    headers = dict(request.headers)
+    headers.pop("host", None)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.request(
+            method=request.method,
+            url=target_url,
+            headers=headers,
+            content=await request.body(),
+            timeout=30,
+        )
+        return StreamingResponse(
+            resp.aiter_bytes(),
+            status_code=resp.status_code,
+            headers=dict(resp.headers),
+        )

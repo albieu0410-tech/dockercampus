@@ -14,7 +14,7 @@ export default function ContainerCard({
   async function doAction(action: "start" | "stop" | "restart") {
     setLoading(true);
     try {
-      await containerAction(container.container_id, action);
+      await containerAction(container.id, action);
       onRefresh();
     } finally {
       setLoading(false);
@@ -25,7 +25,7 @@ export default function ContainerCard({
     if (!confirm("Delete this container?")) return;
     setLoading(true);
     try {
-      await deleteContainer(container.container_id);
+      await deleteContainer(container.id);
       onRefresh();
     } finally {
       setLoading(false);
@@ -33,13 +33,14 @@ export default function ContainerCard({
   }
 
   const isRunning = container.status === "running";
+  const editorUrl = container.editor_url ?? `https://dockcampus.sudelca.com/app/${container.user_id}`;
 
   return (
     <div className="bg-card border rounded-xl p-5 space-y-3 shadow-sm">
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-semibold">{container.name}</p>
-          <p className="text-xs text-muted-foreground">{container.image}</p>
+          <p className="font-semibold">My Environment</p>
+          <p className="text-xs text-muted-foreground">Port {container.port}</p>
         </div>
         <span
           className={`text-xs px-2 py-1 rounded-full font-medium ${
@@ -51,6 +52,17 @@ export default function ContainerCard({
           {container.status}
         </span>
       </div>
+
+      {isRunning && (
+        <a
+          href={editorUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full text-center text-xs bg-primary text-primary-foreground px-3 py-2 rounded-md hover:opacity-90 font-medium"
+        >
+          Open Editor
+        </a>
+      )}
 
       <div className="flex gap-2 flex-wrap">
         {!isRunning && (

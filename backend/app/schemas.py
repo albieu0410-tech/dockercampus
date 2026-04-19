@@ -46,6 +46,7 @@ class ContainerOut(BaseModel):
     memory_limit_mb: int
     user_id: uuid.UUID
     created_at: datetime
+    editor_url: str | None = None
 
     model_config = {"from_attributes": True}
 

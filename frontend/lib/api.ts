@@ -95,11 +95,17 @@ export type User = {
 };
 
 export type Container = {
-  id: number;
-  container_id: string;
-  name: string;
-  image: string;
+  id: string;
+  docker_container_id: string | null;
+  port: number;
   status: string;
-  owner_id: number;
+  user_id: string;
+  cpu_limit: number;
+  memory_limit_mb: number;
   created_at: string;
+  editor_url: string | null;
+  container_id?: string;
+  owner_id?: number | string;
+  name?: string;
+  image?: string;
 };
