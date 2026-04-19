@@ -182,16 +182,31 @@ export default function DashboardPage() {
 
             <div className="bg-card border rounded-xl p-6 space-y-4">
               <div>
-                <h3 className="font-semibold">Deploy a project</h3>
+                <h3 className="font-semibold">Step 1 — Browse repository</h3>
                 <p className="text-muted-foreground text-sm mt-1">
-                  Deploy any GitHub repository to your environment
+                  Enter a repo URL and select a Dockerfile to use
+                </p>
+              </div>
+              <RepoInspector
+                onSelectDockerfile={(_dockerfilePath, selectedRepoUrl) => {
+                  setRepoUrl(selectedRepoUrl);
+                  setSelectedRepo("");
+                }}
+              />
+            </div>
+
+            <div className="bg-card border rounded-xl p-6 space-y-4">
+              <div>
+                <h3 className="font-semibold">Step 2 — Deploy</h3>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Configure and deploy your project
                 </p>
               </div>
 
               <form onSubmit={handleDeploy} className="space-y-4">
                 {githubConnected && repos.length > 0 && (
                   <div className="space-y-1">
-                    <label className="text-sm font-medium">Select from your repos</label>
+                    <label className="text-sm font-medium">Or select from your repos</label>
                     <select
                       value={selectedRepo}
                       onChange={(e) => {
@@ -210,16 +225,22 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                <RepoInspector
-                  onSelectDockerfile={(_dockerfilePath, selectedRepoUrl) => {
-                    setRepoUrl(selectedRepoUrl);
-                    setSelectedRepo("");
-                  }}
-                />
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Repository URL</label>
+                  <input
+                    value={repoUrl}
+                    onChange={(e) => { setRepoUrl(e.target.value); setSelectedRepo(""); }}
+                    placeholder="https://github.com/username/repo"
+                    className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  {repoUrl && (
+                    <p className="text-xs text-green-600">✓ Repo selected: {repoUrl}</p>
+                  )}
+                </div>
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium">
-                    Port <span className="text-muted-foreground">(auto-detected from Dockerfile if empty)</span>
+                    Port <span className="text-muted-foreground">(auto-detected if empty)</span>
                   </label>
                   <input
                     value={customPort}

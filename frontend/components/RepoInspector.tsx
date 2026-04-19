@@ -68,6 +68,7 @@ function TreeNode({
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 shrink-0">
           <button
+            type="button"
             onClick={() => onPreview(node.__path)}
             className="text-xs text-zinc-400 hover:text-zinc-100 px-2 py-0.5 rounded border border-zinc-700 hover:border-zinc-500"
           >
@@ -75,6 +76,7 @@ function TreeNode({
           </button>
           {isDocker && (
             <button
+              type="button"
               onClick={() => onSelect(node.__path)}
               className="text-xs text-white bg-orange-500 hover:bg-orange-600 px-2 py-0.5 rounded"
             >
@@ -91,6 +93,7 @@ function TreeNode({
   return (
     <div>
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 py-1 px-2 w-full text-left hover:bg-zinc-800/50 rounded text-sm"
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
@@ -193,11 +196,17 @@ export default function RepoInspector({ onSelectDockerfile }: Props) {
           type="text"
           value={repoInput}
           onChange={(e) => setRepoInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleLoad()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleLoad();
+            }
+          }}
           placeholder="https://github.com/username/repo or username/repo"
           className="flex-1 border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
         />
         <button
+          type="button"
           onClick={handleLoad}
           disabled={loading}
           className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 shrink-0"
@@ -216,6 +225,7 @@ export default function RepoInspector({ onSelectDockerfile }: Props) {
           <div className="flex flex-wrap gap-2">
             {dockerfiles.map((d) => (
               <button
+                type="button"
                 key={d.path}
                 onClick={() => handleSelect(d.path)}
                 className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md transition-colors"
