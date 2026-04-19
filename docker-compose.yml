@@ -1,4 +1,17 @@
 services:
+  nginx:
+    image: nginx:alpine
+    container_name: dockcampus-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - backend
+      - frontend
+
   db:
     image: postgres:16
     container_name: dockcampus-db
@@ -31,10 +44,11 @@ services:
     container_name: dockcampus-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://dockcampus:j303871992@db:5432/dockcampus
-      RUST_SERVICE_URL: http://container-engine:8001
-      SECRET_KEY: change-me-in-production
-      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL_PYTHON: postgresql+psycopg2://dockcampus:j303871992@db:5432/dockcampus
+      JWT_SECRET: Ch@ngeMeT0S0methingL0ng@ndR@ndom2026!
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: 480
+      CONTAINER_ENGINE_URL: http://container-engine:8001
     ports:
       - "8000:8000"
     depends_on:
@@ -42,12 +56,11 @@ services:
       - container-engine
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        NEXT_PUBLIC_API_URL: https://api.sudelca.com
+    build: ./frontend
     container_name: dockcampus-frontend
     restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: https://dockcampus.sudelca.com/api
     ports:
       - "3000:3000"
     depends_on:
