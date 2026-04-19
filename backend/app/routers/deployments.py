@@ -127,7 +127,7 @@ async def run_deployment(
         await db.commit()
 
 
-@router.post("/", response_model=DeploymentOut, status_code=201)
+@router.post("", response_model=DeploymentOut, status_code=201)
 async def create_deployment(
     body: DeploymentCreate,
     background_tasks: BackgroundTasks,
@@ -174,7 +174,7 @@ async def create_deployment(
     return deployment
 
 
-@router.get("/", response_model=list[DeploymentOut])
+@router.get("", response_model=list[DeploymentOut])
 async def list_deployments(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
