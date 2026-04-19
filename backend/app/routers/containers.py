@@ -219,8 +219,8 @@ async def proxy_to_container(
         raise HTTPException(status_code=503, detail="Container is not running")
 
     target_url = f"http://localhost:{container.port}/{path}"
-    if request.query_string:
-        target_url += f"?{request.query_string.decode()}"
+    if request.url.query:
+        target_url += f"?{request.url.query}"
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
         try:
