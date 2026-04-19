@@ -44,7 +44,7 @@ async def list_containers(
     return [_serialize_container(container) for container in containers]
 
 
-@router.post("/", response_model=ContainerOut, status_code=201)
+@router.post("", response_model=ContainerOut, status_code=201)
 async def create_container(
     body: ContainerCreate,
     db: AsyncSession = Depends(get_db),
