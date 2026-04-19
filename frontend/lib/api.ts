@@ -83,6 +83,29 @@ export async function deleteContainer(id: string) {
   return request(`/containers/${id}`, { method: "DELETE" });
 }
 
+// -- GitHub -------------------------------------------------------------------
+
+export async function getGithubStatus() {
+  return request<GithubConnection | null>("/auth/github/status");
+}
+
+export async function listRepos() {
+  return request<Repo[]>("/auth/github/repos");
+}
+
+// -- Deployments --------------------------------------------------------------
+
+export async function createDeployment(data: { repo_url: string; custom_port?: number }) {
+  return request<Deployment>("/deployments/", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function listDeployments() {
+  return request<Deployment[]>("/deployments/");
+}
+
 // -- Types --------------------------------------------------------------------
 
 export type User = {
@@ -108,4 +131,32 @@ export type Container = {
   owner_id?: number | string;
   name?: string;
   image?: string;
+};
+
+// -- New Types ----------------------------------------------------------------
+
+export type GithubConnection = {
+  id: string;
+  github_username: string;
+  created_at: string;
+};
+
+export type Repo = {
+  name: string;
+  full_name: string;
+  url: string;
+  private: boolean;
+  description: string | null;
+  updated_at: string;
+};
+
+export type Deployment = {
+  id: string;
+  repo_url: string;
+  detected_port: number | null;
+  custom_port: number | null;
+  status: string;
+  build_logs: string | null;
+  public_url: string | null;
+  created_at: string;
 };
