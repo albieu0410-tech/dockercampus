@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import User, GithubConnection
 from app.schemas import GithubConnectionOut
-from app.auth import get_current_user
+from app.auth import get_current_user, verify_token
 
 router = APIRouter(prefix="/auth/github", tags=["github"])
 
@@ -19,13 +19,17 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "https://dockcampus.sudelca.com")
 
 
 @router.get("/login")
-async def github_login(current_user: User = Depends(get_current_user)):
+async def github_login(token: str, db: AsyncSession = Depends(get_db)):
+    user_id = verify_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
     github_auth_url = (
         f"https://github.com/login/oauth/authorize"
         f"?client_id={GITHUB_CLIENT_ID}"
         f"&redirect_uri={GITHUB_REDIRECT_URI}"
         f"&scope=repo,read:user"
-        f"&state={current_user.id}"
+        f"&state={user_id}"
     )
     return RedirectResponse(url=github_auth_url)
 

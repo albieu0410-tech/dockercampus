@@ -165,7 +165,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex gap-3">
                   <a
-                    href="https://api.sudelca.com/auth/github/login"
+                    href={`https://api.sudelca.com/auth/github/login?token=${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}`}
                     className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90"
                   >
                     Connect GitHub
