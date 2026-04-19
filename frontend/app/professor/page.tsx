@@ -7,6 +7,7 @@ import {
   type User, type Container, type Deployment
 } from "@/lib/api";
 import Navbar from "@/components/Navbar";
+import RepoInspector from "@/components/RepoInspector";
 
 type Tab = "overview" | "containers" | "deployments";
 
@@ -269,14 +270,11 @@ export default function ProfessorPage() {
               <form onSubmit={handleDeploy} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="sm:col-span-2 space-y-1">
-                    <label className="text-sm font-medium">GitHub repository URL</label>
-                    <input
-                      type="text"
-                      value={repoUrl}
-                      onChange={(e) => setRepoUrl(e.target.value)}
-                      placeholder="https://github.com/username/repo"
-                      className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                      required
+                    <label className="text-sm font-medium">Browse repository</label>
+                    <RepoInspector
+                      onSelectDockerfile={(_dockerfilePath, selectedRepoUrl) => {
+                        setRepoUrl(selectedRepoUrl);
+                      }}
                     />
                   </div>
                   <div className="space-y-1">

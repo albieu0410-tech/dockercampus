@@ -7,6 +7,7 @@ import {
 } from "@/lib/api";
 import Navbar from "@/components/Navbar";
 import ContainerCard from "@/components/ContainerCard";
+import RepoInspector from "@/components/RepoInspector";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -209,20 +210,12 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">
-                    {githubConnected ? "Or paste a GitHub URL" : "GitHub repository URL"}
-                  </label>
-                  <input
-                    value={repoUrl}
-                    onChange={(e) => {
-                      setRepoUrl(e.target.value);
-                      setSelectedRepo("");
-                    }}
-                    className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="https://github.com/username/repo"
-                  />
-                </div>
+                <RepoInspector
+                  onSelectDockerfile={(_dockerfilePath, selectedRepoUrl) => {
+                    setRepoUrl(selectedRepoUrl);
+                    setSelectedRepo("");
+                  }}
+                />
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium">

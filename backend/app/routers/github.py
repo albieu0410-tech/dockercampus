@@ -136,3 +136,75 @@ async def list_repos(
         }
         for r in repos
     ]
+
+
+@router.get("/tree")
+async def get_repo_tree(
+    repo: str,
+    ref: str = "HEAD",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns the full file tree of a repo.
+    Uses GitHub token if connected, otherwise tries as public repo.
+    """
+    result = await db.execute(
+        select(GithubConnection).where(GithubConnection.user_id == current_user.id)
+    )
+    connection = result.scalar_one_or_none()
+    headers = {"Accept": "application/json"}
+    if connection:
+        headers["Authorization"] = f"Bearer {connection.github_access_token}"
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo}/git/trees/{ref}?recursive=1",
+            headers=headers,
+        )
+
+    if resp.status_code == 404:
+        raise HTTPException(status_code=404, detail="Repo not found or private")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"GitHub error: {resp.text}")
+
+    data = resp.json()
+    tree = [
+        {
+            "path": item["path"],
+            "type": item["type"],
+            "size": item.get("size"),
+        }
+        for item in data.get("tree", [])
+        if not item["path"].startswith(".git")
+    ]
+    return {"tree": tree, "truncated": data.get("truncated", False)}
+
+
+@router.get("/file")
+async def get_file_content(
+    repo: str,
+    path: str,
+    ref: str = "HEAD",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Returns the content of a single file."""
+    result = await db.execute(
+        select(GithubConnection).where(GithubConnection.user_id == current_user.id)
+    )
+    connection = result.scalar_one_or_none()
+    headers = {"Accept": "application/vnd.github.raw"}
+    if connection:
+        headers["Authorization"] = f"Bearer {connection.github_access_token}"
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo}/contents/{path}?ref={ref}",
+            headers=headers,
+        )
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail="File not found")
+
+    return {"content": resp.text, "path": path}

@@ -150,6 +150,18 @@ export async function listRepos() {
   return request<Repo[]>("/auth/github/repos");
 }
 
+export async function getRepoTree(repo: string) {
+  return request<{ tree: { path: string; type: string; size?: number }[]; truncated: boolean }>(
+    `/auth/github/tree?repo=${encodeURIComponent(repo)}`
+  );
+}
+
+export async function getFileContent(repo: string, path: string) {
+  return request<{ content: string; path: string }>(
+    `/auth/github/file?repo=${encodeURIComponent(repo)}&path=${encodeURIComponent(path)}`
+  );
+}
+
 // -- Deployments --------------------------------------------------------------
 
 export async function createDeployment(data: { repo_url: string; custom_port?: number }) {
