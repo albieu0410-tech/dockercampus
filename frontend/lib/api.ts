@@ -27,19 +27,26 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 // -- Auth ---------------------------------------------------------------------
 
 export async function register(data: {
+  full_name: string;
   email: string;
   password: string;
-  full_name: string;
-  role: "student" | "professor";
+  invite_code: string;
 }) {
-  return request<{ access_token: string }>("/auth/register", {
+  return request("/auth/register", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 export async function login(data: { email: string; password: string }) {
-  return request<{ access_token: string }>("/auth/login", {
+  return request<{ otp_session_id: string; message: string }>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function verifyOtp(data: { otp_session_id: string; otp_code: string }) {
+  return request<{ access_token: string; token_type: string }>("/auth/verify-otp", {
     method: "POST",
     body: JSON.stringify(data),
   });

@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { register } from "@/lib/api";
-import { saveToken } from "@/lib/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -10,7 +9,7 @@ export default function RegisterPage() {
     full_name: "",
     email: "",
     password: "",
-    role: "student" as "student" | "professor",
+    invite_code: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,10 +23,8 @@ export default function RegisterPage() {
     setLoading(true);
     setError("");
     try {
-      const { access_token } = await register(form);
-      saveToken(access_token);
-      document.cookie = `token=${access_token}; path=/`;
-      router.push(form.role === "professor" ? "/professor" : "/dashboard");
+      await register(form);
+      router.push("/login?registered=1");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -75,15 +72,15 @@ export default function RegisterPage() {
             />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium">Role</label>
-            <select
-              value={form.role}
-              onChange={(e) => update("role", e.target.value)}
+            <label className="text-sm font-medium">Invite code</label>
+            <input
+              type="text"
+              value={form.invite_code}
+              onChange={(e) => update("invite_code", e.target.value)}
               className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="student">Student</option>
-              <option value="professor">Professor</option>
-            </select>
+              placeholder="Enter your invite code"
+              required
+            />
           </div>
 
           {error && <p className="text-destructive text-sm">{error}</p>}
