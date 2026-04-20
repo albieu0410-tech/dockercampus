@@ -104,7 +104,7 @@ async def run_deployment(
                 json={
                     "user_id": str(deployment.user_id),
                     "image_tag": image_tag,
-                    "workspace_path": "/home/coder/workspace/app",
+                    "container_name": f"dockcampus-student-{str(deployment.user_id)}",
                 },
                 timeout=300,
             )

@@ -19,7 +19,7 @@ use crate::state::AppState;
 pub struct BuildRequest {
     pub user_id: String,
     pub image_tag: String,
-    pub workspace_path: String,
+    pub container_name: String,
 }
 
 #[derive(Serialize)]
@@ -53,17 +53,58 @@ async fn build_image(
     Json(payload): Json<BuildRequest>,
 ) -> Result<Json<BuildResponse>> {
     info!(
-        "Building image {} from {} for user {}",
-        payload.image_tag, payload.workspace_path, payload.user_id
+        "Building image {} from container {} for user {}",
+        payload.image_tag, payload.container_name, payload.user_id
     );
 
+    let tmp_dir = format!("/tmp/build-{}", payload.user_id);
+
+    let _ = tokio::process::Command::new("rm")
+        .args(["-rf", &tmp_dir])
+        .output()
+        .await;
+
+    tokio::process::Command::new("mkdir")
+        .args(["-p", &tmp_dir])
+        .output()
+        .await
+        .map_err(anyhow::Error::from)?;
+
+    let copy_output = tokio::process::Command::new("docker")
+        .args([
+            "cp",
+            &format!("{}:/home/coder/workspace/app/.", &payload.container_name),
+            &tmp_dir,
+        ])
+        .output()
+        .await
+        .map_err(anyhow::Error::from)?;
+
+    if !copy_output.status.success() {
+        let _ = tokio::process::Command::new("rm")
+            .args(["-rf", &tmp_dir])
+            .output()
+            .await;
+        return Ok(Json(BuildResponse {
+            success: false,
+            output: format!(
+                "Failed to copy from container: {}",
+                String::from_utf8_lossy(&copy_output.stderr)
+            ),
+        }));
+    }
+
     let tar_output = tokio::process::Command::new("tar")
-        .args(["-czf", "-", "-C", &payload.workspace_path, "."])
+        .args(["-czf", "-", "-C", &tmp_dir, "."])
         .output()
         .await
         .map_err(anyhow::Error::from)?;
 
     if !tar_output.status.success() {
+        let _ = tokio::process::Command::new("rm")
+            .args(["-rf", &tmp_dir])
+            .output()
+            .await;
         return Ok(Json(BuildResponse {
             success: false,
             output: format!(
@@ -107,6 +148,11 @@ async fn build_image(
             }
         }
     }
+
+    let _ = tokio::process::Command::new("rm")
+        .args(["-rf", &tmp_dir])
+        .output()
+        .await;
 
     Ok(Json(BuildResponse {
         success,
