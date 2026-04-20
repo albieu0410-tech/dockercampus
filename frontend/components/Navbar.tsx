@@ -1,8 +1,48 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { clearToken } from "@/lib/auth";
 import type { User } from "@/lib/api";
+
+type HealthStatus = "ok" | "degraded" | "error" | "loading";
+
+function HealthBadge() {
+  const [status, setStatus] = useState<HealthStatus>("loading");
+
+  async function check() {
+    try {
+      const resp = await fetch("https://api.sudelca.com/health");
+      const data = await resp.json();
+      setStatus(data.status === "ok" ? "ok" : "degraded");
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  useEffect(() => {
+    check();
+    const id = setInterval(check, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const config = {
+    ok: { dot: "bg-green-500 animate-pulse", text: "text-green-600", label: "All systems operational" },
+    degraded: { dot: "bg-yellow-500 animate-pulse", text: "text-yellow-600", label: "Degraded" },
+    error: { dot: "bg-red-500", text: "text-red-600", label: "Service down" },
+    loading: { dot: "bg-zinc-400", text: "text-zinc-400", label: "Checking..." },
+  }[status];
+
+  return (
+    <a
+      href="/health"
+      className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-zinc-200 hover:border-zinc-300 transition-colors"
+      title="View system status"
+    >
+      <span className={`w-2 h-2 rounded-full shrink-0 ${config.dot}`} />
+      <span className={`text-xs font-medium ${config.text}`}>{config.label}</span>
+    </a>
+  );
+}
 
 export default function Navbar({ user }: { user: User }) {
   const router = useRouter();
@@ -15,28 +55,31 @@ export default function Navbar({ user }: { user: User }) {
   }
 
   const navLinks = user.role === "admin"
-    ? [{ href: "/admin", label: "Admin" }, { href: "/dashboard", label: "Dashboard" }, { href: "/health", label: "Status" }]
+    ? [{ href: "/admin", label: "Admin" }, { href: "/dashboard", label: "Dashboard" }]
     : user.role === "professor"
-    ? [{ href: "/professor", label: "Dashboard" }, { href: "/health", label: "Status" }]
-    : [{ href: "/dashboard", label: "Dashboard" }, { href: "/health", label: "Status" }];
+    ? [{ href: "/professor", label: "Dashboard" }]
+    : [{ href: "/dashboard", label: "Dashboard" }];
 
   return (
     <header className="border-b bg-card px-4 sm:px-6 py-3">
       <div className="max-w-6xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-6">
           <span className="font-bold text-lg">DockCampus</span>
-          {/* Desktop nav links */}
           <nav className="hidden sm:flex items-center gap-4">
             {navLinks.map((l) => (
-              <a key={l.href} href={l.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <a
+                key={l.href}
+                href={l.href}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
                 {l.label}
               </a>
             ))}
           </nav>
         </div>
 
-        {/* Desktop right side */}
-        <div className="hidden sm:flex items-center gap-4">
+        <div className="hidden sm:flex items-center gap-3">
+          <HealthBadge />
           <a href="/profile" className="text-sm text-muted-foreground hover:underline">
             {user.full_name}
           </a>
@@ -46,7 +89,6 @@ export default function Navbar({ user }: { user: User }) {
           </button>
         </div>
 
-        {/* Mobile hamburger */}
         <button
           className="sm:hidden p-2 rounded-md hover:bg-muted"
           onClick={() => setMenuOpen(!menuOpen)}
@@ -57,7 +99,6 @@ export default function Navbar({ user }: { user: User }) {
         </button>
       </div>
 
-      {/* Mobile menu */}
       {menuOpen && (
         <div className="sm:hidden border-t mt-3 pt-3 pb-2 space-y-1 px-4">
           {navLinks.map((l) => (
@@ -70,6 +111,13 @@ export default function Navbar({ user }: { user: User }) {
               {l.label}
             </a>
           ))}
+          <a
+            href="/health"
+            className="block py-2 text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => setMenuOpen(false)}
+          >
+            System Status
+          </a>
           <a
             href="/profile"
             className="block py-2 text-sm text-muted-foreground hover:text-foreground"

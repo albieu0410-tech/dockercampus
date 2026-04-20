@@ -8,6 +8,43 @@ import ContainersTab from "./components/ContainersTab";
 
 type Tab = "users" | "invites" | "containers" | "health";
 
+function AdminHealthBadge() {
+  const [status, setStatus] = useState<"ok" | "degraded" | "error" | "loading">("loading");
+
+  async function check() {
+    try {
+      const resp = await fetch("https://api.sudelca.com/health");
+      const data = await resp.json();
+      setStatus(data.status === "ok" ? "ok" : "degraded");
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  useEffect(() => {
+    check();
+    const id = setInterval(check, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const config = {
+    ok: { dot: "bg-green-500 animate-pulse", text: "text-green-400", label: "All systems operational" },
+    degraded: { dot: "bg-yellow-500 animate-pulse", text: "text-yellow-400", label: "Degraded" },
+    error: { dot: "bg-red-500", text: "text-red-400", label: "Service down" },
+    loading: { dot: "bg-zinc-600", text: "text-zinc-500", label: "Checking..." },
+  }[status];
+
+  return (
+    <a
+      href="/health"
+      className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-zinc-800 hover:border-zinc-600 transition-colors"
+    >
+      <span className={`w-2 h-2 rounded-full shrink-0 ${config.dot}`} />
+      <span className={`text-xs font-medium ${config.text}`}>{config.label}</span>
+    </a>
+  );
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("users");
@@ -77,6 +114,7 @@ export default function AdminPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <AdminHealthBadge />
           {/* Mobile tab selector */}
           <select
             className="sm:hidden text-xs rounded px-2 py-1.5"
