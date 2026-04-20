@@ -6,7 +6,7 @@ import UsersTab from "./components/UsersTab";
 import InviteCodesTab from "./components/InviteCodesTab";
 import ContainersTab from "./components/ContainersTab";
 
-type Tab = "users" | "invites" | "containers";
+type Tab = "users" | "invites" | "containers" | "health";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -32,6 +32,7 @@ export default function AdminPage() {
     { key: "users", label: "Users", icon: "⬡" },
     { key: "invites", label: "Invite Codes", icon: "⬢" },
     { key: "containers", label: "Containers", icon: "⬣" },
+    { key: "health", label: "Status", icon: "⬤" },
   ];
 
   return (
@@ -80,7 +81,11 @@ export default function AdminPage() {
           <select
             className="sm:hidden text-xs rounded px-2 py-1.5"
             value={tab}
-            onChange={(e) => setTab(e.target.value as Tab)}
+            onChange={(e) => {
+              const value = e.target.value as Tab;
+              setTab(value);
+              if (value === "health") router.push("/health");
+            }}
           >
             {tabs.map((t) => (
               <option key={t.key} value={t.key}>{t.label}</option>
@@ -101,7 +106,10 @@ export default function AdminPage() {
           {tabs.map((t) => (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              onClick={() => {
+                setTab(t.key);
+                if (t.key === "health") router.push("/health");
+              }}
               className={`w-full text-left px-4 py-3 rounded text-sm transition-all flex items-center gap-3 ${
                 tab === t.key ? "tab-active" : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900"
               }`}

@@ -15,10 +15,10 @@ export default function Navbar({ user }: { user: User }) {
   }
 
   const navLinks = user.role === "admin"
-    ? [{ href: "/admin", label: "Admin" }, { href: "/dashboard", label: "Dashboard" }]
+    ? [{ href: "/admin", label: "Admin" }, { href: "/dashboard", label: "Dashboard" }, { href: "/health", label: "Status" }]
     : user.role === "professor"
-    ? [{ href: "/professor", label: "Dashboard" }]
-    : [{ href: "/dashboard", label: "Dashboard" }];
+    ? [{ href: "/professor", label: "Dashboard" }, { href: "/health", label: "Status" }]
+    : [{ href: "/dashboard", label: "Dashboard" }, { href: "/health", label: "Status" }];
 
   return (
     <header className="border-b bg-card px-4 sm:px-6 py-3">
