@@ -42,26 +42,32 @@ async def run_deployment(
     logs = []
 
     try:
+        # Step 1 — Clean workspace and clone
         deployment.status = "cloning"
         await db.commit()
 
         clone_url = repo_url
         if github_token and "github.com" in repo_url:
-            clone_url = repo_url.replace(
-                "https://", f"https://{github_token}@"
-            )
+            clone_url = repo_url.replace("https://", f"https://{github_token}@")
 
         async with httpx.AsyncClient() as client:
             clone_resp = await client.post(
                 f"{RUST_SERVICE_URL}/containers/{deployment.user_id}/exec",
                 json={
-                    "command": f"git clone {clone_url} /home/coder/workspace/app && echo 'CLONE_SUCCESS'"
+                    "command": f"rm -rf /home/coder/workspace/app && git clone {clone_url} /home/coder/workspace/app && echo 'CLONE_SUCCESS'"
                 },
-                timeout=60,
+                timeout=120,
             )
-            clone_data = clone_resp.json()
-            logs.append(f"Clone: {clone_data.get('output', '')}")
+            clone_output = clone_resp.json().get("output", "")
+            logs.append(f"Clone: {clone_output}")
 
+        if "CLONE_SUCCESS" not in clone_output:
+            deployment.status = "failed"
+            deployment.build_logs = "\n".join(logs)
+            await db.commit()
+            return
+
+        # Step 2 — Read Dockerfile to detect port
         deployment.status = "detecting"
         deployment.build_logs = "\n".join(logs)
         await db.commit()
@@ -74,45 +80,70 @@ async def run_deployment(
             )
             dockerfile_content = dockerfile_resp.json().get("output", "")
 
-        detected_port = await detect_port_from_dockerfile(dockerfile_content)
-        final_port = custom_port or detected_port or 3000
-
-        deployment.detected_port = detected_port
-        deployment.status = "building"
-        deployment.build_logs = "\n".join(logs)
-        await db.commit()
-
-        async with httpx.AsyncClient() as client:
-            build_resp = await client.post(
-                f"{RUST_SERVICE_URL}/containers/{deployment.user_id}/exec",
-                json={
-                    "command": "cd /home/coder/workspace/app && docker build -t student-app . 2>&1 || echo 'BUILD_FAILED'"
-                },
-                timeout=300,
-            )
-            build_output = build_resp.json().get("output", "")
-            logs.append(f"Build: {build_output}")
-
-        if "BUILD_FAILED" in build_output:
+        if "NO_DOCKERFILE" in dockerfile_content:
+            logs.append("No Dockerfile found in repo root")
             deployment.status = "failed"
             deployment.build_logs = "\n".join(logs)
             await db.commit()
             return
 
+        detected_port = await detect_port_from_dockerfile(dockerfile_content)
+        final_port = custom_port or detected_port or 3000
+        deployment.detected_port = detected_port
+
+        # Step 3 — Ask Rust to build the image on the host
+        deployment.status = "building"
+        deployment.build_logs = "\n".join(logs)
+        await db.commit()
+
+        image_tag = f"student-app-{str(deployment.id)[:8]}"
+
+        async with httpx.AsyncClient() as client:
+            build_resp = await client.post(
+                f"{RUST_SERVICE_URL}/deployments/build",
+                json={
+                    "user_id": str(deployment.user_id),
+                    "image_tag": image_tag,
+                    "workspace_path": "/home/coder/workspace/app",
+                },
+                timeout=300,
+            )
+            build_data = build_resp.json()
+            build_output = build_data.get("output", "")
+            logs.append(f"Build: {build_output}")
+
+        if build_data.get("success") is False or "error" in build_output.lower():
+            deployment.status = "failed"
+            deployment.build_logs = "\n".join(logs)
+            await db.commit()
+            return
+
+        # Step 4 — Run the built image
         deployment.status = "starting"
         deployment.build_logs = "\n".join(logs)
         await db.commit()
 
+        container_name = f"deployment-{str(deployment.id)[:8]}"
+
         async with httpx.AsyncClient() as client:
             run_resp = await client.post(
-                f"{RUST_SERVICE_URL}/containers/{deployment.user_id}/exec",
+                f"{RUST_SERVICE_URL}/deployments/run",
                 json={
-                    "command": f"docker run -d -p {final_port}:{final_port} --name student-app-{deployment.user_id} student-app 2>&1"
+                    "image_tag": image_tag,
+                    "container_name": container_name,
+                    "port": final_port,
                 },
-                timeout=30,
+                timeout=60,
             )
-            run_output = run_resp.json().get("output", "")
+            run_data = run_resp.json()
+            run_output = run_data.get("output", "")
             logs.append(f"Run: {run_output}")
+
+        if run_data.get("success") is False:
+            deployment.status = "failed"
+            deployment.build_logs = "\n".join(logs)
+            await db.commit()
+            return
 
         public_url = f"{BASE_URL}/app/{deployment.user_id}/proxy/{final_port}/"
         deployment.status = "running"
