@@ -67,6 +67,18 @@ export default function ProfessorPage() {
     }
   }
 
+  async function retryDeployment(_deploymentId: string, retryRepoUrl: string, port?: number | null) {
+    try {
+      await createDeployment({
+        repo_url: retryRepoUrl,
+        custom_port: port ?? undefined,
+      });
+      await load();
+    } catch (err: any) {
+      console.error(err);
+    }
+  }
+
   async function handleContainerAction(id: string, action: "start" | "stop" | "restart") {
     setActionLoading(id + action);
     try {
@@ -314,13 +326,24 @@ export default function ProfessorPage() {
                         Port: {d.custom_port || d.detected_port || "auto"}
                       </p>
                     </div>
-                    <span className={`self-start text-xs px-2 py-1 rounded-full font-medium ${
-                      d.status === "running" ? "bg-green-100 text-green-700" :
-                      d.status === "failed" ? "bg-red-100 text-red-700" :
-                      "bg-yellow-100 text-yellow-700"
-                    }`}>
-                      {d.status}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        d.status === "running" ? "bg-green-100 text-green-700" :
+                        d.status === "failed" ? "bg-red-100 text-red-700" :
+                        "bg-yellow-100 text-yellow-700"
+                      }`}>
+                        {d.status}
+                      </span>
+                      {(d.status === "failed" || d.status === "error") && (
+                        <button
+                          type="button"
+                          onClick={() => retryDeployment(d.id, d.repo_url, d.custom_port)}
+                          className="text-xs bg-primary text-primary-foreground px-3 py-1 rounded-md hover:opacity-90"
+                        >
+                          ↺ Retry
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {d.public_url && (
                     <a

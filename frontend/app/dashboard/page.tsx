@@ -81,6 +81,18 @@ export default function DashboardPage() {
     }
   }
 
+  async function retryDeployment(_deploymentId: string, retryRepoUrl: string, port?: number | null) {
+    try {
+      await createDeployment({
+        repo_url: retryRepoUrl,
+        custom_port: port ?? undefined,
+      });
+      await load();
+    } catch (err: any) {
+      console.error(err);
+    }
+  }
+
   if (!user) return (
     <div className="min-h-screen flex items-center justify-center">
       <p className="text-muted-foreground">Loading...</p>
@@ -273,20 +285,31 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 {deployments.map((d) => (
                   <div key={d.id} className="bg-card border rounded-xl p-5 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div className="min-w-0">
                         <p className="font-medium text-sm truncate max-w-xs">{d.repo_url}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Port: {d.custom_port || d.detected_port || "auto"}
                         </p>
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        d.status === "running" ? "bg-green-100 text-green-700" :
-                        d.status === "failed" ? "bg-red-100 text-red-700" :
-                        "bg-yellow-100 text-yellow-700"
-                      }`}>
-                        {d.status}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          d.status === "running" ? "bg-green-100 text-green-700" :
+                          d.status === "failed" ? "bg-red-100 text-red-700" :
+                          "bg-yellow-100 text-yellow-700"
+                        }`}>
+                          {d.status}
+                        </span>
+                        {(d.status === "failed" || d.status === "error") && (
+                          <button
+                            type="button"
+                            onClick={() => retryDeployment(d.id, d.repo_url, d.custom_port)}
+                            className="text-xs bg-primary text-primary-foreground px-3 py-1 rounded-md hover:opacity-90"
+                          >
+                            ↺ Retry
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {d.public_url && (
                       <a
@@ -303,7 +326,7 @@ export default function DashboardPage() {
                         <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                           View build logs
                         </summary>
-                        <pre className="mt-2 bg-muted rounded p-3 overflow-x-auto text-xs whitespace-pre-wrap">
+                        <pre className="mt-2 bg-muted rounded p-3 overflow-x-auto text-xs whitespace-pre-wrap max-h-48">
                           {d.build_logs}
                         </pre>
                       </details>
