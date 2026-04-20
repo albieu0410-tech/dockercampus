@@ -10,19 +10,38 @@ type Props = {
 
 function buildTree(items: TreeItem[]) {
   const tree: Record<string, any> = {};
+
+  // First add all directories explicitly
   for (const item of items) {
-    const parts = item.path.split("/");
-    let node = tree;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      if (!node[part]) {
-        node[part] = i === parts.length - 1
-          ? { __file: true, __path: item.path, __size: item.size }
-          : {};
+    if (item.type === "tree") {
+      const parts = item.path.split("/");
+      let node = tree;
+      for (const part of parts) {
+        if (!node[part]) node[part] = {};
+        node = node[part];
       }
-      node = node[part];
     }
   }
+
+  // Then add all files
+  for (const item of items) {
+    if (item.type === "blob") {
+      const parts = item.path.split("/");
+      let node = tree;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        if (!node[part]) node[part] = {};
+        node = node[part];
+      }
+      const fileName = parts[parts.length - 1];
+      node[fileName] = {
+        __file: true,
+        __path: item.path,
+        __size: item.size,
+      };
+    }
+  }
+
   return tree;
 }
 
@@ -104,12 +123,12 @@ function TreeNode({
       {open && (
         <div>
           {children
-            .sort(([, a], [, b]) => {
+            .sort(([nameA, a], [nameB, b]) => {
               const aIsFile = (a as any).__file;
               const bIsFile = (b as any).__file;
               if (aIsFile && !bIsFile) return 1;
               if (!aIsFile && bIsFile) return -1;
-              return 0;
+              return nameA.localeCompare(nameB);
             })
             .map(([childName, childNode]) => (
               <TreeNode
@@ -246,12 +265,12 @@ export default function RepoInspector({ onSelectDockerfile }: Props) {
             </div>
             <div className="overflow-y-auto max-h-96 py-2">
               {Object.entries(builtTree)
-                .sort(([, a], [, b]) => {
+                .sort(([nameA, a], [nameB, b]) => {
                   const aIsFile = (a as any).__file;
                   const bIsFile = (b as any).__file;
                   if (aIsFile && !bIsFile) return 1;
                   if (!aIsFile && bIsFile) return -1;
-                  return 0;
+                  return nameA.localeCompare(nameB);
                 })
                 .map(([name, node]) => (
                   <TreeNode
