@@ -64,6 +64,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .nest("/containers", handlers::containers::router())
+        .nest("/deployments", handlers::deployments::router())
         .nest("/monitor", handlers::monitor::router())
         .layer(cors)
         .with_state(state);
