@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { getRepoTree, getFileContent } from "@/lib/api";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 type TreeItem = { path: string; type: string; size?: number };
 
@@ -8,10 +10,44 @@ type Props = {
   onSelectDockerfile: (path: string, repoUrl: string) => void;
 };
 
+function getLanguage(path: string): string {
+  const name = path.split("/").pop() || "";
+  if (name === "Dockerfile" || name.startsWith("Dockerfile.")) return "docker";
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  const map: Record<string, string> = {
+    ts: "typescript",
+    tsx: "tsx",
+    js: "javascript",
+    jsx: "jsx",
+    py: "python",
+    rs: "rust",
+    go: "go",
+    java: "java",
+    json: "json",
+    yaml: "yaml",
+    yml: "yaml",
+    toml: "toml",
+    sh: "bash",
+    bash: "bash",
+    zsh: "bash",
+    md: "markdown",
+    css: "css",
+    scss: "scss",
+    html: "html",
+    xml: "xml",
+    sql: "sql",
+    env: "bash",
+    gitignore: "bash",
+  };
+  return map[ext] || "text";
+}
+
+function isDockerfile(name: string) {
+  return name === "Dockerfile" || name.startsWith("Dockerfile.");
+}
+
 function buildTree(items: TreeItem[]) {
   const tree: Record<string, any> = {};
-
-  // First add all directories explicitly
   for (const item of items) {
     if (item.type === "tree") {
       const parts = item.path.split("/");
@@ -22,31 +58,49 @@ function buildTree(items: TreeItem[]) {
       }
     }
   }
-
-  // Then add all files
   for (const item of items) {
     if (item.type === "blob") {
       const parts = item.path.split("/");
       let node = tree;
       for (let i = 0; i < parts.length - 1; i++) {
-        const part = parts[i];
-        if (!node[part]) node[part] = {};
-        node = node[part];
+        if (!node[parts[i]]) node[parts[i]] = {};
+        node = node[parts[i]];
       }
       const fileName = parts[parts.length - 1];
-      node[fileName] = {
-        __file: true,
-        __path: item.path,
-        __size: item.size,
-      };
+      node[fileName] = { __file: true, __path: item.path, __size: item.size };
     }
   }
-
   return tree;
 }
 
-function isDockerfile(name: string) {
-  return name === "Dockerfile" || name.startsWith("Dockerfile.");
+function getFileIcon(name: string): string {
+  if (isDockerfile(name)) return "🐳";
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  const icons: Record<string, string> = {
+    ts: "🔷",
+    tsx: "🔷",
+    js: "🟨",
+    jsx: "🟨",
+    py: "🐍",
+    rs: "🦀",
+    go: "🐹",
+    java: "☕",
+    json: "📋",
+    yaml: "📋",
+    yml: "📋",
+    toml: "📋",
+    md: "📝",
+    css: "🎨",
+    scss: "🎨",
+    html: "🌐",
+    sh: "⚙️",
+    bash: "⚙️",
+    env: "🔐",
+    gitignore: "🚫",
+    sql: "🗄️",
+    lock: "🔒",
+  };
+  return icons[ext] || "📄";
 }
 
 function TreeNode({
@@ -55,54 +109,64 @@ function TreeNode({
   depth = 0,
   onSelect,
   onPreview,
+  activeFile,
 }: {
   name: string;
   node: any;
   depth?: number;
   onSelect: (path: string) => void;
   onPreview: (path: string) => void;
+  activeFile: string | null;
 }) {
   const [open, setOpen] = useState(depth < 2);
   const isFile = node.__file;
   const isDocker = isFile && isDockerfile(name);
+  const isActive = isFile && activeFile === node.__path;
 
   if (isFile) {
     return (
       <div
-        className={`flex items-center justify-between gap-2 py-1 px-2 rounded text-sm group ${
-          isDocker ? "bg-orange-500/10 border border-orange-500/20" : "hover:bg-zinc-800/50"
+        onClick={() => onPreview(node.__path)}
+        className={`flex items-center justify-between gap-2 py-1.5 px-2 rounded cursor-pointer text-sm group transition-colors ${
+          isActive
+            ? "bg-primary/10 border border-primary/20"
+            : isDocker
+              ? "bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/15"
+              : "hover:bg-muted/60"
         }`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs shrink-0">{isDocker ? "🐳" : "📄"}</span>
-          <span className={`truncate ${isDocker ? "text-orange-400 font-medium" : "text-zinc-300"}`}>
+          <span className="text-xs shrink-0">{getFileIcon(name)}</span>
+          <span
+            className={`truncate text-xs ${
+              isDocker
+                ? "text-orange-400 font-medium"
+                : isActive
+                  ? "text-primary font-medium"
+                  : "text-zinc-300"
+            }`}
+          >
             {name}
           </span>
           {isDocker && (
-            <span className="text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded shrink-0">
-              Dockerfile
+            <span className="text-xs bg-orange-500/20 text-orange-400 px-1 py-0.5 rounded shrink-0">
+              dockerfile
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 shrink-0">
+        {isDocker && (
           <button
             type="button"
-            onClick={() => onPreview(node.__path)}
-            className="text-xs text-zinc-400 hover:text-zinc-100 px-2 py-0.5 rounded border border-zinc-700 hover:border-zinc-500"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(node.__path);
+            }}
+            className="text-xs text-white bg-orange-500 hover:bg-orange-600 px-2 py-0.5 rounded shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            View
+            Use
           </button>
-          {isDocker && (
-            <button
-              type="button"
-              onClick={() => onSelect(node.__path)}
-              className="text-xs text-white bg-orange-500 hover:bg-orange-600 px-2 py-0.5 rounded"
-            >
-              Use
-            </button>
-          )}
-        </div>
+        )}
       </div>
     );
   }
@@ -114,11 +178,11 @@ function TreeNode({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 py-1 px-2 w-full text-left hover:bg-zinc-800/50 rounded text-sm"
+        className="flex items-center gap-2 py-1.5 px-2 w-full text-left hover:bg-muted/60 rounded text-sm transition-colors"
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
         <span className="text-xs shrink-0">{open ? "📂" : "📁"}</span>
-        <span className="text-zinc-200 font-medium">{name}</span>
+        <span className="text-zinc-200 font-medium text-xs">{name}</span>
       </button>
       {open && (
         <div>
@@ -138,6 +202,7 @@ function TreeNode({
                 depth={depth + 1}
                 onSelect={onSelect}
                 onPreview={onPreview}
+                activeFile={activeFile}
               />
             ))}
         </div>
@@ -154,6 +219,7 @@ export default function RepoInspector({ onSelectDockerfile }: Props) {
   const [preview, setPreview] = useState<{ path: string; content: string } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [repoName, setRepoName] = useState("");
+  const [activeFile, setActiveFile] = useState<string | null>(null);
 
   function parseRepo(input: string): string | null {
     try {
@@ -177,6 +243,7 @@ export default function RepoInspector({ onSelectDockerfile }: Props) {
     setLoading(true);
     setTree(null);
     setPreview(null);
+    setActiveFile(null);
     setRepoName(repo);
     try {
       const data = await getRepoTree(repo);
@@ -189,6 +256,7 @@ export default function RepoInspector({ onSelectDockerfile }: Props) {
   }
 
   async function handlePreview(path: string) {
+    setActiveFile(path);
     setPreviewLoading(true);
     try {
       const data = await getFileContent(repoName, path);
@@ -201,11 +269,12 @@ export default function RepoInspector({ onSelectDockerfile }: Props) {
   }
 
   function handleSelect(dockerfilePath: string) {
-    const repoUrl = `https://github.com/${repoName}`;
-    onSelectDockerfile(dockerfilePath, repoUrl);
+    onSelectDockerfile(dockerfilePath, `https://github.com/${repoName}`);
   }
 
-  const dockerfiles = tree?.filter((i) => i.type === "blob" && isDockerfile(i.path.split("/").pop()!)) ?? [];
+  const dockerfiles =
+    tree?.filter((i) => i.type === "blob" && isDockerfile(i.path.split("/").pop()!)) ?? [];
+
   const builtTree = tree ? buildTree(tree) : null;
 
   return (
@@ -258,12 +327,12 @@ export default function RepoInspector({ onSelectDockerfile }: Props) {
 
       {builtTree && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="border rounded-lg overflow-hidden">
-            <div className="bg-muted px-4 py-2 border-b flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">{repoName}</span>
-              <span className="text-xs text-muted-foreground">{tree?.length} files</span>
+          <div className="border rounded-lg overflow-hidden bg-zinc-950">
+            <div className="bg-zinc-900 px-4 py-2 border-b border-zinc-800 flex items-center justify-between">
+              <span className="text-xs font-medium text-zinc-400">{repoName}</span>
+              <span className="text-xs text-zinc-500">{tree?.length} files</span>
             </div>
-            <div className="overflow-y-auto max-h-96 py-2">
+            <div className="overflow-y-auto max-h-[500px] py-1">
               {Object.entries(builtTree)
                 .sort(([nameA, a], [nameB, b]) => {
                   const aIsFile = (a as any).__file;
@@ -280,29 +349,53 @@ export default function RepoInspector({ onSelectDockerfile }: Props) {
                     depth={0}
                     onSelect={handleSelect}
                     onPreview={handlePreview}
+                    activeFile={activeFile}
                   />
                 ))}
             </div>
           </div>
 
-          <div className="border rounded-lg overflow-hidden">
-            <div className="bg-muted px-4 py-2 border-b">
-              <span className="text-xs font-medium text-muted-foreground">
-                {preview ? preview.path : "Select a file to preview"}
+          <div className="border rounded-lg overflow-hidden bg-zinc-950">
+            <div className="bg-zinc-900 px-4 py-2 border-b border-zinc-800 flex items-center justify-between">
+              <span className="text-xs font-medium text-zinc-400">
+                {preview ? preview.path : "Click a file to preview"}
               </span>
+              {preview && isDockerfile(preview.path.split("/").pop()!) && (
+                <button
+                  type="button"
+                  onClick={() => handleSelect(preview.path)}
+                  className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded"
+                >
+                  Use this Dockerfile
+                </button>
+              )}
             </div>
-            <div className="overflow-y-auto max-h-96">
+            <div className="overflow-y-auto max-h-[500px]">
               {previewLoading ? (
-                <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+                <div className="flex items-center justify-center h-32 text-zinc-500 text-sm">
+                  <div className="w-4 h-4 border border-zinc-500 border-t-transparent rounded-full animate-spin mr-2" />
                   Loading...
                 </div>
               ) : preview ? (
-                <pre className="p-4 text-xs text-foreground whitespace-pre-wrap break-words font-mono">
+                <SyntaxHighlighter
+                  language={getLanguage(preview.path)}
+                  style={vscDarkPlus}
+                  customStyle={{
+                    margin: 0,
+                    borderRadius: 0,
+                    fontSize: "12px",
+                    background: "transparent",
+                    minHeight: "100%",
+                  }}
+                  showLineNumbers
+                  wrapLongLines
+                >
                   {preview.content}
-                </pre>
+                </SyntaxHighlighter>
               ) : (
-                <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-                  Click "View" on any file
+                <div className="flex flex-col items-center justify-center h-32 text-zinc-500 text-sm gap-1">
+                  <span className="text-2xl">📄</span>
+                  <span>Click any file to preview</span>
                 </div>
               )}
             </div>
