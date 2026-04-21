@@ -33,6 +33,15 @@ class VerifyOTPRequest(BaseModel):
     otp_code: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
 class UpdateProfileRequest(BaseModel):
     full_name: Optional[str] = None
 
@@ -87,6 +96,7 @@ class GithubConnectionOut(BaseModel):
     id: uuid.UUID
     github_username: str
     created_at: datetime
+
     model_config = {"from_attributes": True}
 
 
@@ -104,12 +114,14 @@ class DeploymentOut(BaseModel):
     build_logs: str | None
     public_url: str | None
     created_at: datetime
+
     model_config = {"from_attributes": True}
 
 
 class InviteCodeCreate(BaseModel):
     role: UserRole = UserRole.student
     expires_at: Optional[datetime] = None
+    class_id: Optional[uuid.UUID] = None
 
 
 class InviteCodeOut(BaseModel):
@@ -119,4 +131,35 @@ class InviteCodeOut(BaseModel):
     is_used: bool
     expires_at: Optional[datetime]
     created_at: datetime
+    class_id: Optional[uuid.UUID] = None
+
+    model_config = {"from_attributes": True}
+
+
+# Class schemas
+class ClassCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+
+class ClassOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: Optional[str]
+    professor_id: uuid.UUID
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ClassMembershipCreate(BaseModel):
+    user_id: uuid.UUID
+
+
+class ClassMembershipOut(BaseModel):
+    id: uuid.UUID
+    class_id: uuid.UUID
+    user_id: uuid.UUID
+    joined_at: datetime
+
     model_config = {"from_attributes": True}

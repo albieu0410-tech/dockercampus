@@ -2,7 +2,7 @@ import os
 import re
 import httpx
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -13,12 +13,20 @@ from app.auth import get_current_user
 
 router = APIRouter(prefix="/deployments", tags=["deployments"])
 
-RUST_SERVICE_URL = os.getenv("CONTAINER_ENGINE_URL", "http://container-engine:8001")
-BASE_URL = os.getenv("BASE_URL", "https://dockcampus.sudelca.com")
+RUST_SERVICE_URL = os.getenv(
+    "CONTAINER_ENGINE_URL", "http://container-engine:8001"
+)
+BASE_URL = os.getenv(
+    "BASE_URL", "https://dockcampus.sudelca.com"
+)
 
 
-async def detect_port_from_dockerfile(dockerfile_content: str) -> int | None:
-    match = re.search(r"EXPOSE\s+(\d+)", dockerfile_content, re.IGNORECASE)
+async def detect_port_from_dockerfile(
+    dockerfile_content: str,
+) -> int | None:
+    match = re.search(
+        r"EXPOSE\s+(\d+)", dockerfile_content, re.IGNORECASE
+    )
     if match:
         return int(match.group(1))
     return None
@@ -42,19 +50,26 @@ async def run_deployment(
     logs = []
 
     try:
-        # Step 1 — Clean workspace and clone
         deployment.status = "cloning"
         await db.commit()
 
         clone_url = repo_url
         if github_token and "github.com" in repo_url:
-            clone_url = repo_url.replace("https://", f"https://{github_token}@")
+            clone_url = repo_url.replace(
+                "https://", f"https://{github_token}@"
+            )
 
         async with httpx.AsyncClient() as client:
             clone_resp = await client.post(
-                f"{RUST_SERVICE_URL}/containers/{deployment.user_id}/exec",
+                f"{RUST_SERVICE_URL}/containers"
+                f"/{deployment.user_id}/exec",
                 json={
-                    "command": f"rm -rf /home/coder/workspace/app && git clone {clone_url} /home/coder/workspace/app && echo 'CLONE_SUCCESS'"
+                    "command": (
+                        f"rm -rf /home/coder/workspace/app && "
+                        f"git clone {clone_url} "
+                        f"/home/coder/workspace/app && "
+                        f"echo 'CLONE_SUCCESS'"
+                    )
                 },
                 timeout=120,
             )
@@ -67,15 +82,20 @@ async def run_deployment(
             await db.commit()
             return
 
-        # Step 2 — Read Dockerfile to detect port
         deployment.status = "detecting"
         deployment.build_logs = "\n".join(logs)
         await db.commit()
 
         async with httpx.AsyncClient() as client:
             dockerfile_resp = await client.post(
-                f"{RUST_SERVICE_URL}/containers/{deployment.user_id}/exec",
-                json={"command": "cat /home/coder/workspace/app/Dockerfile 2>/dev/null || echo 'NO_DOCKERFILE'"},
+                f"{RUST_SERVICE_URL}/containers"
+                f"/{deployment.user_id}/exec",
+                json={
+                    "command": (
+                        "cat /home/coder/workspace/app/Dockerfile "
+                        "2>/dev/null || echo 'NO_DOCKERFILE'"
+                    )
+                },
                 timeout=10,
             )
             dockerfile_content = dockerfile_resp.json().get("output", "")
@@ -87,11 +107,12 @@ async def run_deployment(
             await db.commit()
             return
 
-        detected_port = await detect_port_from_dockerfile(dockerfile_content)
+        detected_port = await detect_port_from_dockerfile(
+            dockerfile_content
+        )
         final_port = custom_port or detected_port or 3000
         deployment.detected_port = detected_port
 
-        # Step 3 — Ask Rust to build the image on the host
         deployment.status = "building"
         deployment.build_logs = "\n".join(logs)
         await db.commit()
@@ -104,7 +125,9 @@ async def run_deployment(
                 json={
                     "user_id": str(deployment.user_id),
                     "image_tag": image_tag,
-                    "container_name": f"dockcampus-student-{str(deployment.user_id)}",
+                    "container_name": (
+                        f"dockcampus-student-{str(deployment.user_id)}"
+                    ),
                 },
                 timeout=300,
             )
@@ -112,13 +135,15 @@ async def run_deployment(
             build_output = build_data.get("output", "")
             logs.append(f"Build: {build_output}")
 
-        if build_data.get("success") is False or "error" in build_output.lower():
+        if (
+            build_data.get("success") is False
+            or "error" in build_output.lower()
+        ):
             deployment.status = "failed"
             deployment.build_logs = "\n".join(logs)
             await db.commit()
             return
 
-        # Step 4 — Run the built image
         deployment.status = "starting"
         deployment.build_logs = "\n".join(logs)
         await db.commit()
@@ -145,7 +170,10 @@ async def run_deployment(
             await db.commit()
             return
 
-        public_url = f"{BASE_URL}/app/{deployment.user_id}/proxy/{final_port}/"
+        public_url = (
+            f"{BASE_URL}/app/{deployment.user_id}"
+            f"/proxy/{final_port}/"
+        )
         deployment.status = "running"
         deployment.public_url = public_url
         deployment.build_logs = "\n".join(logs)
@@ -170,15 +198,27 @@ async def create_deployment(
     )
     container = container_result.scalar_one_or_none()
     if not container:
-        raise HTTPException(status_code=404, detail="No container found — create one first")
+        raise HTTPException(
+            status_code=404,
+            detail="No container found — create one first",
+        )
     if container.status != "running":
-        raise HTTPException(status_code=400, detail="Container is not running")
+        raise HTTPException(
+            status_code=400,
+            detail="Container is not running",
+        )
 
     github_result = await db.execute(
-        select(GithubConnection).where(GithubConnection.user_id == current_user.id)
+        select(GithubConnection).where(
+            GithubConnection.user_id == current_user.id
+        )
     )
     github_connection = github_result.scalar_one_or_none()
-    github_token = github_connection.github_access_token if github_connection else None
+    github_token = (
+        github_connection.github_access_token
+        if github_connection
+        else None
+    )
 
     deployment = Deployment(
         user_id=current_user.id,
@@ -207,11 +247,18 @@ async def create_deployment(
 
 @router.get("", response_model=list[DeploymentOut])
 async def list_deployments(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    offset = (page - 1) * limit
     result = await db.execute(
-        select(Deployment).where(Deployment.user_id == current_user.id)
+        select(Deployment)
+        .where(Deployment.user_id == current_user.id)
+        .order_by(Deployment.created_at.desc())
+        .offset(offset)
+        .limit(limit)
     )
     return result.scalars().all()
 
@@ -231,5 +278,8 @@ async def get_deployment(
     )
     deployment = result.scalar_one_or_none()
     if not deployment:
-        raise HTTPException(status_code=404, detail="Deployment not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Deployment not found",
+        )
     return deployment
