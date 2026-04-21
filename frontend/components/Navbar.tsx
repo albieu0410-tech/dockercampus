@@ -57,10 +57,24 @@ export default function Navbar({ user }: { user: User }) {
   }
 
   const navLinks = user.role === "admin"
-    ? [{ href: "/admin", label: "Admin" }, { href: "/dashboard", label: "Dashboard" }, { href: "/health", label: "Health" }]
+    ? [
+        { href: "/admin", label: "Admin" },
+        { href: "/dashboard", label: "Dashboard" },
+        { href: "/hive", label: "Hive" },
+        { href: "/health", label: "Health" },
+      ]
     : user.role === "professor"
-      ? [{ href: "/professor", label: "Classes" }, { href: "/dashboard", label: "My Environment" }, { href: "/health", label: "Health" }]
-      : [{ href: "/dashboard", label: "Dashboard" }, { href: "/health", label: "Health" }];
+      ? [
+          { href: "/professor", label: "Classes" },
+          { href: "/dashboard", label: "My Environment" },
+          { href: "/routing", label: "Routing" },
+          { href: "/health", label: "Health" },
+        ]
+      : [
+          { href: "/dashboard", label: "Dashboard" },
+          { href: "/routing", label: "Routing" },
+          { href: "/health", label: "Health" },
+        ];
 
   return (
     <header className="navbar">
