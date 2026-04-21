@@ -1,9 +1,9 @@
 "use client";
-import { useState, Suspense } from "react";
+
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { login, verifyOtp } from "@/lib/api";
+import { getMe, login, verifyOtp } from "@/lib/api";
 import { saveToken } from "@/lib/auth";
-import { getMe } from "@/lib/api";
 
 function LoginForm() {
   const router = useRouter();
@@ -58,90 +58,51 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted">
-      <div className="bg-card border rounded-xl shadow-sm p-8 w-full max-w-md space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">DockCampus</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {otpSessionId ? "Check your email for a 6-digit code" : "Sign in to your account"}
-          </p>
+    <div className="page-shell" style={{ display: "grid", placeItems: "center", padding: 16 }}>
+      <div className="card" style={{ width: "100%", maxWidth: 420, padding: 28 }}>
+        <div className="stack-y-2">
+          <div className="label-ups">DockCampus</div>
+          <h2>{otpSessionId ? "Two-factor verification" : "Sign in"}</h2>
+          <p>{otpSessionId ? "Check your email for the 6-digit code." : "Sign in to continue."}</p>
         </div>
 
         {justRegistered && !otpSessionId && (
-          <p className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-md px-3 py-2">
-            Account created! Sign in to continue.
-          </p>
+          <p style={{ color: "#4ade80", fontSize: 13, marginTop: 14 }}>Account created. Sign in to continue.</p>
         )}
 
         {!otpSessionId ? (
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              />
-            </div>
-            {error && <p className="text-destructive text-sm">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary text-primary-foreground rounded-md py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
-            >
+          <form onSubmit={handleLogin} className="stack-y-3" style={{ marginTop: 18 }}>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" placeholder="Email" required />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input" placeholder="Password" required />
+            {error && <p style={{ color: "#fca5a5", fontSize: 13 }}>{error}</p>}
+            <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%" }}>
               {loading ? "Signing in..." : "Sign in"}
             </button>
           </form>
         ) : (
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">6-digit code</label>
-              <input
-                type="text"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value)}
-                className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary tracking-widest text-center text-lg"
-                maxLength={6}
-                placeholder="••••••"
-                required
-              />
-            </div>
-            {error && <p className="text-destructive text-sm">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary text-primary-foreground rounded-md py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
-            >
+          <form onSubmit={handleVerifyOtp} className="stack-y-3" style={{ marginTop: 18 }}>
+            <input
+              type="text"
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value)}
+              className="input mono"
+              maxLength={6}
+              placeholder="6-digit code"
+              required
+              style={{ letterSpacing: "0.35em", textAlign: "center" }}
+            />
+            {error && <p style={{ color: "#fca5a5", fontSize: 13 }}>{error}</p>}
+            <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%" }}>
               {loading ? "Verifying..." : "Verify code"}
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setOtpSessionId(null);
-                setError("");
-              }}
-              className="w-full text-sm text-muted-foreground hover:underline"
-            >
-              ← Back to login
+            <button type="button" onClick={() => { setOtpSessionId(null); setError(""); }} className="btn btn-ghost" style={{ width: "100%" }}>
+              Back to login
             </button>
           </form>
         )}
 
-        <p className="text-sm text-center text-muted-foreground">
-          No account?{" "}
-          <a href="/register" className="text-primary hover:underline">Register</a>
+        <p style={{ marginTop: 16, fontSize: 13 }}>
+          No account? <a href="/register">Register</a>
         </p>
       </div>
     </div>

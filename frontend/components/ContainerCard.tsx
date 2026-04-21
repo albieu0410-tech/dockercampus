@@ -1,6 +1,8 @@
 "use client";
+
+import { useMemo, useState } from "react";
+import { Play, RotateCcw, Square, Trash2, ExternalLink } from "lucide-react";
 import { containerAction, deleteContainer, type Container } from "@/lib/api";
-import { useState } from "react";
 
 export default function ContainerCard({
   container,
@@ -34,71 +36,71 @@ export default function ContainerCard({
 
   const isRunning = container.status === "running";
   const editorUrl = container.editor_url || `https://dockcampus.sudelca.com/app/${container.user_id}/`;
+  const statusClass = isRunning ? "status-running" : "status-sleeping";
+
+  const cpu = useMemo(() => Math.max(5, Math.min(96, Math.round(container.cpu_limit || 20))), [container.cpu_limit]);
+  const ram = useMemo(() => Math.max(10, Math.min(95, Math.round(((container.memory_limit_mb || 256) / 1024) * 100))), [container.memory_limit_mb]);
 
   return (
-    <div className="bg-card border rounded-xl p-5 space-y-3 shadow-sm">
-      <div className="flex items-start justify-between">
+    <div className="card card-pad stack-y-4">
+      <div className="flex-between" style={{ alignItems: "flex-start" }}>
         <div>
-          <p className="font-semibold">My Environment</p>
-          <p className="text-xs text-muted-foreground">Port {container.port}</p>
+          <div className={`status-dot ${statusClass}`}>
+            <span className="status-dot-circle" />
+            {container.status}
+          </div>
+          <h3 style={{ marginTop: 10 }}>My environment</h3>
+          <p className="mono" style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+            {container.id} · :{container.port}
+          </p>
         </div>
-        <span
-          className={`text-xs px-2 py-1 rounded-full font-medium ${
-            isRunning
-              ? "bg-green-100 text-green-700"
-              : "bg-muted text-muted-foreground"
-          }`}
-        >
-          {container.status}
-        </span>
       </div>
 
-      {isRunning && (
-        <a
-          href={editorUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block w-full text-center text-xs bg-primary text-primary-foreground px-3 py-2 rounded-md hover:opacity-90 font-medium"
-        >
-          Open Editor
-        </a>
-      )}
+      <div className="stack-y-3">
+        <div>
+          <div className="flex-between" style={{ marginBottom: 6 }}>
+            <span className="label-ups">CPU</span>
+            <span className="mono" style={{ fontSize: 12 }}>{cpu}%</span>
+          </div>
+          <div className="meter"><div className="meter-fill" style={{ width: `${cpu}%` }} /></div>
+        </div>
+        <div>
+          <div className="flex-between" style={{ marginBottom: 6 }}>
+            <span className="label-ups">RAM</span>
+            <span className="mono" style={{ fontSize: 12 }}>{container.memory_limit_mb}MB</span>
+          </div>
+          <div className="meter"><div className="meter-fill" style={{ width: `${ram}%` }} /></div>
+        </div>
+      </div>
 
-      <div className="flex gap-2 flex-wrap">
-        {!isRunning && (
-          <button
-            onClick={() => doAction("start")}
-            disabled={loading}
-            className="text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-md hover:opacity-90 disabled:opacity-50"
-          >
-            Start
-          </button>
-        )}
+      <div className="stack-y-2">
         {isRunning && (
-          <>
-            <button
-              onClick={() => doAction("stop")}
-              disabled={loading}
-              className="text-xs bg-muted text-foreground px-3 py-1.5 rounded-md hover:opacity-80 disabled:opacity-50"
-            >
-              Stop
-            </button>
-            <button
-              onClick={() => doAction("restart")}
-              disabled={loading}
-              className="text-xs bg-muted text-foreground px-3 py-1.5 rounded-md hover:opacity-80 disabled:opacity-50"
-            >
-              Restart
-            </button>
-          </>
+          <a href={editorUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ width: "100%" }}>
+            <ExternalLink size={14} />
+            Open editor
+          </a>
         )}
-        <button
-          onClick={doDelete}
-          disabled={loading}
-          className="text-xs bg-destructive text-destructive-foreground px-3 py-1.5 rounded-md hover:opacity-90 disabled:opacity-50"
-        >
-          Delete
-        </button>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {!isRunning && (
+            <button onClick={() => doAction("start")} disabled={loading} className="btn btn-secondary btn-sm" type="button">
+              <Play size={13} /> Start
+            </button>
+          )}
+          {isRunning && (
+            <>
+              <button onClick={() => doAction("stop")} disabled={loading} className="btn btn-secondary btn-sm" type="button">
+                <Square size={13} /> Stop
+              </button>
+              <button onClick={() => doAction("restart")} disabled={loading} className="btn btn-secondary btn-sm" type="button">
+                <RotateCcw size={13} /> Restart
+              </button>
+            </>
+          )}
+          <button onClick={doDelete} disabled={loading} className="btn btn-danger btn-sm" type="button">
+            <Trash2 size={13} /> Delete
+          </button>
+        </div>
       </div>
     </div>
   );

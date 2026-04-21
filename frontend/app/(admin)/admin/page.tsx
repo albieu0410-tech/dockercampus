@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getMe } from "@/lib/api";
+import { apiUrl, getMe } from "@/lib/api";
 import UsersTab from "./components/UsersTab";
 import InviteCodesTab from "./components/InviteCodesTab";
 import ContainersTab from "./components/ContainersTab";
@@ -13,7 +13,7 @@ function AdminHealthBadge() {
 
   async function check() {
     try {
-      const resp = await fetch("https://api.sudelca.com/health");
+      const resp = await fetch(apiUrl("/health"));
       const data = await resp.json();
       setStatus(data.status === "ok" ? "ok" : "degraded");
     } catch {
