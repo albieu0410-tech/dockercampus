@@ -29,7 +29,7 @@ from app.schemas import (
     ForgotPasswordRequest,
     ResetPasswordRequest,
 )
-from main import limiter
+from app.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
