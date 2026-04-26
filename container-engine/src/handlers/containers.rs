@@ -1,16 +1,18 @@
+use crate::db;
+use crate::errors::{AppError, Result};
+use crate::state::AppState;
 use axum::{
-    Router,
-    routing::{get, post, delete},
-    extract::{Path, State},
-    Json,
+    body::Bytes,
+    extract::{Path, RawQuery, State},
+    http::{HeaderMap, Method, StatusCode},
+    response::{IntoResponse, Response},
+    routing::{any, delete, get, post},
+    Json, Router,
 };
+use serde::{Deserialize, Serialize};
+use sqlx::Row;
 use std::sync::Arc;
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
-use crate::state::AppState;
-use crate::errors::{AppError, Result};
-use crate::db;
-use crate::models::container::{ContainerStats, ContainerStatus, ContainerResponse};
 
 #[derive(Deserialize)]
 pub struct CreateContainerRequest {
@@ -35,6 +37,7 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(list_containers))
         .route("/create", post(create_container))
+        .route("/:user_id/app/*path", any(proxy_to_container_http))
         .route("/:user_id/exec", post(exec_in_container))
         .route("/:user_id/start", post(start_container))
         .route("/:user_id/stop", post(stop_container))
@@ -73,8 +76,7 @@ fn sanitize_command(cmd: &str) -> Result<String> {
     for pattern in &blocked_patterns {
         if cmd.to_lowercase().contains(&pattern.to_lowercase()) {
             return Err(AppError::BadRequest(
-                "Command contains blocked pattern and cannot be executed."
-                    .to_string(),
+                "Command contains blocked pattern and cannot be executed.".to_string(),
             ));
         }
     }
@@ -88,17 +90,15 @@ fn sanitize_command(cmd: &str) -> Result<String> {
     Ok(cmd.to_string())
 }
 
-async fn list_containers(
-    State(state): State<Arc<AppState>>,
-) -> Result<Json<serde_json::Value>> {
-    let containers = sqlx::query!(
+async fn list_containers(State(state): State<Arc<AppState>>) -> Result<Json<serde_json::Value>> {
+    let containers = sqlx::query(
         r#"
         SELECT c.id, c.user_id, c.docker_container_id,
-               c.port, c.status as "status: String",
+               c.port, c.status,
                c.cpu_limit, c.memory_limit_mb, c.created_at
         FROM containers c
         ORDER BY c.created_at DESC
-        "#
+        "#,
     )
     .fetch_all(&state.db)
     .await?;
@@ -114,12 +114,11 @@ async fn create_container(
     let cpu_limit = payload.cpu_limit.unwrap_or(0.5);
     let user_id = payload.user_id.to_string();
 
-    let ram_check = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM containers WHERE status = 'running'"
-    )
-    .fetch_one(&state.db)
-    .await?
-    .unwrap_or(0);
+    let ram_check: i64 =
+        sqlx::query("SELECT COUNT(*) AS count FROM containers WHERE status = 'running'")
+            .fetch_one(&state.db)
+            .await?
+            .try_get("count")?;
 
     let max_containers: i64 = std::env::var("MAX_CONTAINERS")
         .unwrap_or_else(|_| "8".to_string())
@@ -139,7 +138,7 @@ async fn create_container(
 
     state.docker.start_container(&docker_id).await?;
 
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO containers (
             user_id, docker_container_id, port,
@@ -147,19 +146,16 @@ async fn create_container(
         )
         VALUES ($1, $2, $3, 'running', $4, $5)
         "#,
-        payload.user_id,
-        docker_id,
-        port,
-        cpu_limit,
-        memory_limit_mb
     )
+    .bind(payload.user_id)
+    .bind(&docker_id)
+    .bind(port)
+    .bind(cpu_limit)
+    .bind(memory_limit_mb)
     .execute(&state.db)
     .await?;
 
-    let editor_url = format!(
-        "https://dockcampus.sudelca.com/student/{}",
-        user_id
-    );
+    let editor_url = format!("https://dockcampus.sudelca.com/student/{}", user_id);
 
     Ok(Json(CreateContainerResponse {
         container_id: docker_id,
@@ -172,33 +168,26 @@ async fn start_container(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
-    let container = sqlx::query!(
-        "SELECT docker_container_id FROM containers WHERE user_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| {
-        AppError::NotFound(format!(
-            "Container for user {} not found",
-            user_id
-        ))
-    })?;
+    let container = sqlx::query("SELECT docker_container_id FROM containers WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Container for user {} not found", user_id)))?;
 
-    let docker_id = container.docker_container_id.ok_or_else(|| {
-        AppError::NotFound("Docker container ID not set".to_string())
-    })?;
+    let docker_id = container
+        .try_get::<Option<String>, _>("docker_container_id")?
+        .ok_or_else(|| AppError::NotFound("Docker container ID not set".to_string()))?;
 
     state.docker.start_container(&docker_id).await?;
 
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE containers
         SET status = 'running', last_activity = NOW()
         WHERE user_id = $1
         "#,
-        user_id
     )
+    .bind(user_id)
     .execute(&state.db)
     .await?;
 
@@ -212,14 +201,14 @@ async fn wake_container(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
-    let container = sqlx::query!(
+    let container = sqlx::query(
         r#"
         SELECT docker_container_id
         FROM containers
         WHERE user_id = $1 AND status = 'sleeping'
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_optional(&state.db)
     .await?;
 
@@ -227,20 +216,20 @@ async fn wake_container(
         return Ok(Json(serde_json::json!({ "status": "not_sleeping" })));
     };
 
-    let docker_id = c.docker_container_id.ok_or_else(|| {
-        AppError::NotFound("Docker container ID not set".to_string())
-    })?;
+    let docker_id = c
+        .try_get::<Option<String>, _>("docker_container_id")?
+        .ok_or_else(|| AppError::NotFound("Docker container ID not set".to_string()))?;
 
     state.docker.start_container(&docker_id).await?;
 
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE containers
         SET status = 'running', last_activity = NOW()
         WHERE user_id = $1
         "#,
-        user_id
     )
+    .bind(user_id)
     .execute(&state.db)
     .await?;
 
@@ -253,31 +242,22 @@ async fn stop_container(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
-    let container = sqlx::query!(
-        "SELECT docker_container_id FROM containers WHERE user_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| {
-        AppError::NotFound(format!(
-            "Container for user {} not found",
-            user_id
-        ))
-    })?;
+    let container = sqlx::query("SELECT docker_container_id FROM containers WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Container for user {} not found", user_id)))?;
 
-    let docker_id = container.docker_container_id.ok_or_else(|| {
-        AppError::NotFound("Docker container ID not set".to_string())
-    })?;
+    let docker_id = container
+        .try_get::<Option<String>, _>("docker_container_id")?
+        .ok_or_else(|| AppError::NotFound("Docker container ID not set".to_string()))?;
 
     state.docker.stop_container(&docker_id).await?;
 
-    sqlx::query!(
-        "UPDATE containers SET status = 'stopped' WHERE user_id = $1",
-        user_id
-    )
-    .execute(&state.db)
-    .await?;
+    sqlx::query("UPDATE containers SET status = 'stopped' WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
 
     Ok(Json(serde_json::json!({
         "message": "Container stopped successfully",
@@ -289,31 +269,29 @@ async fn delete_container(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
-    let container = sqlx::query!(
-        "SELECT docker_container_id, port FROM containers WHERE user_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| {
-        AppError::NotFound(format!(
-            "Container for user {} not found",
-            user_id
-        ))
-    })?;
+    let container =
+        sqlx::query("SELECT docker_container_id, port FROM containers WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| {
+                AppError::NotFound(format!("Container for user {} not found", user_id))
+            })?;
 
-    if let Some(docker_id) = container.docker_container_id.as_deref() {
+    if let Some(docker_id) = container
+        .try_get::<Option<String>, _>("docker_container_id")?
+        .as_deref()
+    {
         state.docker.remove_container(docker_id).await?;
     }
 
-    db::release_port(&state.db, container.port).await?;
+    let port: i32 = container.try_get("port")?;
+    db::release_port(&state.db, port).await?;
 
-    sqlx::query!(
-        "DELETE FROM containers WHERE user_id = $1",
-        user_id
-    )
-    .execute(&state.db)
-    .await?;
+    sqlx::query("DELETE FROM containers WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
 
     Ok(Json(serde_json::json!({
         "message": "Container deleted successfully",
@@ -325,22 +303,15 @@ async fn get_container_stats(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
-    let container = sqlx::query!(
-        "SELECT docker_container_id FROM containers WHERE user_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| {
-        AppError::NotFound(format!(
-            "Container for user {} not found",
-            user_id
-        ))
-    })?;
+    let container = sqlx::query("SELECT docker_container_id FROM containers WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Container for user {} not found", user_id)))?;
 
-    let docker_id = container.docker_container_id.ok_or_else(|| {
-        AppError::NotFound("Docker container ID not set".to_string())
-    })?;
+    let docker_id = container
+        .try_get::<Option<String>, _>("docker_container_id")?
+        .ok_or_else(|| AppError::NotFound("Docker container ID not set".to_string()))?;
 
     let stats = state.docker.get_container_stats(&docker_id).await?;
 
@@ -359,30 +330,152 @@ async fn exec_in_container(
 ) -> Result<Json<serde_json::Value>> {
     let safe_command = sanitize_command(&payload.command)?;
 
-    let container = sqlx::query!(
-        "SELECT docker_container_id FROM containers WHERE user_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| {
-        AppError::NotFound(format!(
-            "Container for user {} not found",
-            user_id
-        ))
-    })?;
+    let container = sqlx::query("SELECT docker_container_id FROM containers WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Container for user {} not found", user_id)))?;
 
-    let docker_id = container.docker_container_id.ok_or_else(|| {
-        AppError::NotFound("Docker container ID not set".to_string())
-    })?;
+    let docker_id = container
+        .try_get::<Option<String>, _>("docker_container_id")?
+        .ok_or_else(|| AppError::NotFound("Docker container ID not set".to_string()))?;
 
-    let output = state
-        .docker
-        .exec_command(&docker_id, &safe_command)
+    sqlx::query("UPDATE containers SET last_activity = NOW() WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&state.db)
         .await?;
+
+    let output = state.docker.exec_command(&docker_id, &safe_command).await?;
 
     Ok(Json(serde_json::json!({
         "output": output,
         "success": true
     })))
+}
+
+#[derive(Debug)]
+struct ProxyTarget {
+    status: String,
+    port: i32,
+    docker_container_id: Option<String>,
+}
+
+async fn proxy_to_container_http(
+    State(state): State<Arc<AppState>>,
+    Path((user_id, path)): Path<(String, String)>,
+    RawQuery(query): RawQuery,
+    method: Method,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response> {
+    let user_id = parse_user_id(&user_id)?;
+    let target = fetch_proxy_target(&state, user_id).await?;
+
+    if target.status == "sleeping" {
+        wake_sleeping_container(&state, user_id, target.docker_container_id.as_deref()).await?;
+        return Ok((
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({
+                "detail": "Container is waking up. Please try again in a few seconds."
+            })),
+        )
+            .into_response());
+    }
+
+    if target.status != "running" {
+        return Ok((
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({ "detail": "Container is not running" })),
+        )
+            .into_response());
+    }
+
+    touch_last_activity(&state, user_id).await?;
+
+    let mut target_url = format!("http://host.docker.internal:{}/{}", target.port, path);
+    if let Some(query) = query.as_deref().filter(|q| !q.is_empty()) {
+        target_url.push('?');
+        target_url.push_str(query);
+    }
+
+    let reqwest_method =
+        reqwest::Method::from_bytes(method.as_str().as_bytes()).map_err(anyhow::Error::from)?;
+    let mut req_builder = state.http_client.request(reqwest_method, &target_url);
+    for (name, value) in &headers {
+        if should_skip_proxy_header(name.as_str()) {
+            continue;
+        }
+        req_builder = req_builder.header(name, value);
+    }
+    req_builder = req_builder.body(body);
+
+    let upstream = req_builder.send().await.map_err(anyhow::Error::from)?;
+    let status = upstream.status();
+    let mut resp = axum::http::Response::builder().status(status.as_u16());
+    for (name, value) in upstream.headers() {
+        if !should_skip_response_header(name.as_str()) {
+            resp = resp.header(name, value);
+        }
+    }
+    let bytes = upstream.bytes().await.map_err(anyhow::Error::from)?;
+    Ok(resp
+        .body(axum::body::Body::from(bytes))
+        .map_err(anyhow::Error::from)?
+        .into_response())
+}
+
+fn parse_user_id(value: &str) -> Result<Uuid> {
+    Uuid::parse_str(value).map_err(|_| AppError::BadRequest("Invalid user ID".to_string()))
+}
+
+async fn fetch_proxy_target(state: &AppState, user_id: Uuid) -> Result<ProxyTarget> {
+    let row = sqlx::query(
+        "SELECT status::text as status, port, docker_container_id FROM containers WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Container not found".to_string()))?;
+
+    Ok(ProxyTarget {
+        status: row.try_get("status")?,
+        port: row.try_get("port")?,
+        docker_container_id: row.try_get("docker_container_id")?,
+    })
+}
+
+async fn wake_sleeping_container(
+    state: &AppState,
+    user_id: Uuid,
+    docker_container_id: Option<&str>,
+) -> Result<()> {
+    if let Some(docker_id) = docker_container_id {
+        state.docker.start_container(docker_id).await?;
+        sqlx::query(
+            "UPDATE containers SET status = 'running', last_activity = NOW() WHERE user_id = $1",
+        )
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+    }
+    Ok(())
+}
+
+async fn touch_last_activity(state: &AppState, user_id: Uuid) -> Result<()> {
+    sqlx::query("UPDATE containers SET last_activity = NOW() WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+    Ok(())
+}
+
+fn should_skip_proxy_header(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "host" | "content-length" | "connection" | "upgrade"
+    )
+}
+
+fn should_skip_response_header(name: &str) -> bool {
+    matches!(name.to_ascii_lowercase().as_str(), "transfer-encoding")
 }

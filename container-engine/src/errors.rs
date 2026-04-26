@@ -20,6 +20,18 @@ pub enum AppError {
     #[error("Bad request: {0}")]
     BadRequest(String),
 
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
+    #[error("Conflict: {0}")]
+    Conflict(String),
+
+    #[error("Too many requests: {0}")]
+    TooManyRequests(String),
+
     #[error("Internal server error: {0}")]
     Internal(#[from] anyhow::Error),
 
@@ -37,6 +49,10 @@ impl IntoResponse for AppError {
             AppError::Docker(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg.clone()),
+            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg.clone()),
+            AppError::Conflict(msg) => (StatusCode::CONFLICT, msg.clone()),
+            AppError::TooManyRequests(msg) => (StatusCode::TOO_MANY_REQUESTS, msg.clone()),
             AppError::Internal(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             AppError::NoAvailablePorts => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
             AppError::ResourceLimitExceeded => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
@@ -44,6 +60,7 @@ impl IntoResponse for AppError {
 
         let body = Json(json!({
             "error": message,
+            "detail": message,
             "status": status.as_u16()
         }));
 

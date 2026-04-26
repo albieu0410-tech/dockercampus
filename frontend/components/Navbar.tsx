@@ -61,12 +61,18 @@ export default function Navbar({ user }: { user: User }) {
         { href: "/admin", label: "Admin" },
         { href: "/dashboard", label: "Dashboard" },
         { href: "/hive", label: "Hive" },
+        { href: "/sleep", label: "Sleep" },
+        { href: "/jobs", label: "Jobs" },
+        { href: "/wireguard", label: "WireGuard" },
         { href: "/health", label: "Health" },
       ]
     : user.role === "professor"
       ? [
           { href: "/professor", label: "Classes" },
           { href: "/dashboard", label: "My Environment" },
+          { href: "/sleep", label: "Sleep" },
+          { href: "/jobs", label: "Jobs" },
+          { href: "/wireguard", label: "WireGuard" },
           { href: "/routing", label: "Routing" },
           { href: "/health", label: "Health" },
         ]

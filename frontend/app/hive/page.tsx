@@ -3,25 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, RefreshCw, Crown } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { getMe, type User } from "@/lib/api";
+import { getHiveJoinInfo, getMe, listHiveNodes, type HiveNode, type User } from "@/lib/api";
 
-type HiveNode = {
-  id: string;
-  role: "queen" | "worker";
-  host: string;
-  ip: string;
-  ramUsed: number;
-  ramTotal: number;
-  cpu: number;
-  diskUsed: number;
-  diskTotal: number;
-  deployments: number;
-  last: string;
-};
+type HiveNodeView = HiveNode;
 
 export default function HivePage() {
   const [user, setUser] = useState<User | null>(null);
-  const [nodes, setNodes] = useState<HiveNode[]>([]);
+  const [nodes, setNodes] = useState<HiveNodeView[]>([]);
   const [loadingNodes, setLoadingNodes] = useState(false);
   const [joinCommand, setJoinCommand] = useState("");
   const [joinToken, setJoinToken] = useState("");
@@ -35,6 +23,14 @@ export default function HivePage() {
   async function loadHiveData() {
     setLoadingNodes(true);
     try {
+      const [fetchedNodes, join] = await Promise.all([
+        listHiveNodes(),
+        getHiveJoinInfo().catch(() => null),
+      ]);
+      setNodes(fetchedNodes);
+      setJoinCommand(join?.join_command || "");
+      setJoinToken(join?.join_token || "");
+    } catch {
       setNodes([]);
       setJoinCommand("");
       setJoinToken("");
@@ -76,9 +72,9 @@ export default function HivePage() {
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 12 }}>
           {nodes.map((n) => {
-            const ramPct = (n.ramUsed / n.ramTotal) * 100;
+            const ramPct = (n.ram_used / n.ram_total) * 100;
             const cpuPct = n.cpu;
-            const diskPct = (n.diskUsed / n.diskTotal) * 100;
+            const diskPct = (n.disk_used / n.disk_total) * 100;
             return (
               <div key={n.id} className="card card-pad stack-y-3">
                 <div className="flex-between">
@@ -91,7 +87,7 @@ export default function HivePage() {
                 <p className="mono" style={{ fontSize: 11 }}>{n.host} · {n.ip}</p>
 
                 <div>
-                  <div className="flex-between" style={{ marginBottom: 6 }}><span className="label-ups">RAM</span><span className="mono" style={{ fontSize: 11 }}>{n.ramUsed.toFixed(1)}/{n.ramTotal} GB</span></div>
+                  <div className="flex-between" style={{ marginBottom: 6 }}><span className="label-ups">RAM</span><span className="mono" style={{ fontSize: 11 }}>{n.ram_used.toFixed(1)}/{n.ram_total} GB</span></div>
                   <div className="meter"><div className="meter-fill" style={{ width: `${ramPct}%` }} /></div>
                 </div>
                 <div>
@@ -99,7 +95,7 @@ export default function HivePage() {
                   <div className="meter"><div className="meter-fill" style={{ width: `${cpuPct}%` }} /></div>
                 </div>
                 <div>
-                  <div className="flex-between" style={{ marginBottom: 6 }}><span className="label-ups">Disk</span><span className="mono" style={{ fontSize: 11 }}>{n.diskUsed}/{n.diskTotal} GB</span></div>
+                  <div className="flex-between" style={{ marginBottom: 6 }}><span className="label-ups">Disk</span><span className="mono" style={{ fontSize: 11 }}>{n.disk_used}/{n.disk_total} GB</span></div>
                   <div className="meter"><div className="meter-fill" style={{ width: `${diskPct}%` }} /></div>
                 </div>
 

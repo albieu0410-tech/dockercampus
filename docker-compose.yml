@@ -11,6 +11,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
+      - container-engine
       - backend
       - frontend
 
@@ -49,8 +50,8 @@ services:
       - "host.docker.internal:host-gateway"
     env_file:
       - .env
-    ports:
-      - "8000:8000"
+    # Kept temporarily for /app/* HTTP+websocket proxy until Rust parity is complete.
+    # Remove this service after porting containers app proxy/tunnel endpoints to Rust.
     depends_on:
       - db
       - container-engine
@@ -69,7 +70,7 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      - container-engine
 
 volumes:
   postgres_data:

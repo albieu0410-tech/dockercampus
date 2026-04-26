@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
-axum = { version = "0.7", features = ["json"] }
+axum = { version = "0.7", features = ["json", "ws"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "migrate"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -20,3 +20,13 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tower = "0.4"
 futures-util = "0.3"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
+jsonwebtoken = "9"
+bcrypt = "0.15"
+rand = "0.8"
+rand_core = "0.6"
+reqwest = { version = "0.12", features = ["json"] }
+validator = { version = "0.18", features = ["derive"] }
+regex = "1"
+base64 = "0.22"
+x25519-dalek = "2"
+tokio-tungstenite = "0.21"

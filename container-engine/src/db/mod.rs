@@ -1,5 +1,5 @@
-use sqlx::PgPool;
 use crate::errors::Result;
+use sqlx::PgPool;
 
 pub async fn get_available_port(pool: &PgPool) -> Result<i32> {
     let port = sqlx::query_scalar::<_, i32>(
@@ -14,7 +14,7 @@ pub async fn get_available_port(pool: &PgPool) -> Result<i32> {
             FOR UPDATE SKIP LOCKED
         )
         RETURNING port
-        "#
+        "#,
     )
     .fetch_optional(pool)
     .await?
@@ -29,7 +29,7 @@ pub async fn release_port(pool: &PgPool, port: i32) -> Result<()> {
         UPDATE ports
         SET is_available = true, user_id = NULL
         WHERE port = $1
-        "#
+        "#,
     )
     .bind(port)
     .execute(pool)

@@ -1,3 +1,14 @@
+pub mod auth;
+pub mod classes;
 pub mod containers;
-pub mod monitor;
 pub mod deployments;
+pub mod github;
+pub mod health;
+pub mod hive;
+pub mod jobs;
+pub mod monitor;
+pub mod resources;
+pub mod routing;
+pub mod sleep;
+pub mod users;
+pub mod wireguard;

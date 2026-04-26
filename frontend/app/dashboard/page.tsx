@@ -9,6 +9,7 @@ import {
   getGithubStatus,
   listRepos,
   createDeployment,
+  cancelDeployment,
   listDeployments,
   apiUrl,
   type User,
@@ -102,6 +103,11 @@ export default function DashboardPage() {
 
   async function retryDeployment(_deploymentId: string, retryRepoUrl: string, port?: number | null) {
     await createDeployment({ repo_url: retryRepoUrl, custom_port: port ?? undefined });
+    await load();
+  }
+
+  async function stopDeployment(deploymentId: string) {
+    await cancelDeployment(deploymentId);
     await load();
   }
 
@@ -275,12 +281,17 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span className={`status-dot ${d.status === "running" ? "status-running" : d.status === "failed" ? "status-error" : "status-building"}`}>
+                      <span className={`status-dot ${d.status === "running" ? "status-running" : d.status === "failed" || d.status === "cancelled" ? "status-error" : "status-building"}`}>
                         <span className="status-dot-circle" /> {d.status}
                       </span>
-                      {(d.status === "failed" || d.status === "error") && (
+                      {(d.status === "failed" || d.status === "error" || d.status === "cancelled") && (
                         <button type="button" onClick={() => retryDeployment(d.id, d.repo_url, d.custom_port)} className="btn btn-secondary btn-sm">
                           <RotateCcw size={12} /> Retry
+                        </button>
+                      )}
+                      {["pending", "cloning", "detecting", "building", "starting", "running"].includes(d.status) && (
+                        <button type="button" onClick={() => stopDeployment(d.id)} className="btn btn-ghost btn-sm">
+                          Cancel
                         </button>
                       )}
                     </div>

@@ -216,3 +216,8 @@ __marimo__/
 
 new-design
 new-design/
+
+.next/
+node_modules/
+.next
+node_modules

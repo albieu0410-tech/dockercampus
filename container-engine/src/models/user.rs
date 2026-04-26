@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub enum UserRole {
     Student,
     Professor,
+    Admin,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

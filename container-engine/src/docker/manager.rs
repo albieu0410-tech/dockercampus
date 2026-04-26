@@ -1,19 +1,16 @@
+use crate::models::container::ContainerStats;
+use crate::models::container::ContainerStatus;
 use anyhow::Result;
-use bollard::Docker;
 use bollard::container::{
-    CreateContainerOptions, Config, StartContainerOptions,
-    StopContainerOptions, RemoveContainerOptions, Stats, StatsOptions,
+    Config, CreateContainerOptions, RemoveContainerOptions, StartContainerOptions, Stats,
+    StatsOptions, StopContainerOptions,
 };
-use bollard::models::{
-    HostConfig, Resources, PortBinding, RestartPolicy,
-    RestartPolicyNameEnum,
-};
+use bollard::models::{HostConfig, PortBinding, RestartPolicy, RestartPolicyNameEnum};
 use bollard::network::CreateNetworkOptions;
+use bollard::Docker;
 use futures_util::StreamExt;
 use std::collections::HashMap;
 use tracing::info;
-use crate::models::container::ContainerStats;
-use crate::models::container::ContainerStatus;
 
 pub struct DockerManager {
     pub client: Docker,
@@ -26,18 +23,19 @@ impl DockerManager {
         Ok(Self { client })
     }
 
-    pub async fn create_student_network(
-        &self,
-        user_id: &str,
-    ) -> Result<String> {
+    pub async fn create_student_network(&self, user_id: &str) -> Result<String> {
         let network_name = format!("dockcampus-student-{}", user_id);
 
-        match self.client.inspect_network(&network_name, None).await {
+        match self
+            .client
+            .inspect_network(
+                &network_name,
+                None::<bollard::network::InspectNetworkOptions<String>>,
+            )
+            .await
+        {
             Ok(_) => {
-                info!(
-                    "Network {} already exists, reusing",
-                    network_name
-                );
+                info!("Network {} already exists, reusing", network_name);
                 return Ok(network_name);
             }
             Err(_) => {}
@@ -79,8 +77,7 @@ impl DockerManager {
             }]),
         );
 
-        let mut exposed_ports: HashMap<&str, HashMap<(), ()>> =
-            HashMap::new();
+        let mut exposed_ports: HashMap<&str, HashMap<(), ()>> = HashMap::new();
         exposed_ports.insert("8080/tcp", HashMap::new());
 
         let memory_bytes = (memory_limit_mb as i64) * 1024 * 1024;
@@ -118,25 +115,16 @@ impl DockerManager {
             platform: None,
         };
 
-        let response = self
-            .client
-            .create_container(Some(options), config)
-            .await?;
+        let response = self.client.create_container(Some(options), config).await?;
 
-        info!(
-            "Created container {} for user {}",
-            response.id, user_id
-        );
+        info!("Created container {} for user {}", response.id, user_id);
 
         Ok(response.id)
     }
 
     pub async fn start_container(&self, container_id: &str) -> Result<()> {
         self.client
-            .start_container(
-                container_id,
-                None::<StartContainerOptions<String>>,
-            )
+            .start_container(container_id, None::<StartContainerOptions<String>>)
             .await?;
 
         info!("Started container {}", container_id);
@@ -145,20 +133,14 @@ impl DockerManager {
 
     pub async fn stop_container(&self, container_id: &str) -> Result<()> {
         self.client
-            .stop_container(
-                container_id,
-                Some(StopContainerOptions { t: 10 }),
-            )
+            .stop_container(container_id, Some(StopContainerOptions { t: 10 }))
             .await?;
 
         info!("Stopped container {}", container_id);
         Ok(())
     }
 
-    pub async fn remove_container(
-        &self,
-        container_id: &str,
-    ) -> Result<()> {
+    pub async fn remove_container(&self, container_id: &str) -> Result<()> {
         self.client
             .remove_container(
                 container_id,
@@ -173,11 +155,7 @@ impl DockerManager {
         Ok(())
     }
 
-    pub async fn exec_command(
-        &self,
-        container_id: &str,
-        command: &str,
-    ) -> Result<String> {
+    pub async fn exec_command(&self, container_id: &str, command: &str) -> Result<String> {
         use bollard::exec::{CreateExecOptions, StartExecResults};
         use futures_util::StreamExt;
 
@@ -207,10 +185,7 @@ impl DockerManager {
         Ok(output)
     }
 
-    pub async fn get_container_stats(
-        &self,
-        container_id: &str,
-    ) -> Result<ContainerStats> {
+    pub async fn get_container_stats(&self, container_id: &str) -> Result<ContainerStats> {
         let mut stream = self.client.stats(
             container_id,
             Some(StatsOptions {
@@ -225,18 +200,8 @@ impl DockerManager {
             .ok_or_else(|| anyhow::anyhow!("No stats returned"))??;
 
         let cpu_usage = calculate_cpu_percent(&stats);
-        let memory_usage_mb = stats
-            .memory_stats
-            .usage
-            .unwrap_or(0) as f64
-            / 1024.0
-            / 1024.0;
-        let memory_limit_mb = stats
-            .memory_stats
-            .limit
-            .unwrap_or(0) as f64
-            / 1024.0
-            / 1024.0;
+        let memory_usage_mb = stats.memory_stats.usage.unwrap_or(0) as f64 / 1024.0 / 1024.0;
+        let memory_limit_mb = stats.memory_stats.limit.unwrap_or(0) as f64 / 1024.0 / 1024.0;
 
         Ok(ContainerStats {
             container_id: container_id.to_string(),
@@ -249,10 +214,7 @@ impl DockerManager {
 
     pub async fn get_system_stats(&self) -> Result<SystemStats> {
         let info = self.client.info().await?;
-        let containers = self
-            .client
-            .list_containers::<String>(None)
-            .await?;
+        let containers = self.client.list_containers::<String>(None).await?;
 
         Ok(SystemStats {
             total_containers: containers.len() as i32,
@@ -269,17 +231,10 @@ fn calculate_cpu_percent(stats: &Stats) -> f64 {
     let cpu_delta = stats.cpu_stats.cpu_usage.total_usage as f64
         - stats.precpu_stats.cpu_usage.total_usage as f64;
 
-    let system_delta = stats
-        .cpu_stats
-        .system_cpu_usage
-        .unwrap_or(0) as f64
-        - stats
-            .precpu_stats
-            .system_cpu_usage
-            .unwrap_or(0) as f64;
+    let system_delta = stats.cpu_stats.system_cpu_usage.unwrap_or(0) as f64
+        - stats.precpu_stats.system_cpu_usage.unwrap_or(0) as f64;
 
-    let num_cpus =
-        stats.cpu_stats.online_cpus.unwrap_or(1) as f64;
+    let num_cpus = stats.cpu_stats.online_cpus.unwrap_or(1) as f64;
 
     if system_delta > 0.0 {
         (cpu_delta / system_delta) * num_cpus * 100.0
