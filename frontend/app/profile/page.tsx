@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { getMe, updateProfile, changePassword, deleteAccount } from "@/lib/api";
 import { removeToken } from "@/lib/auth";
 import type { User } from "@/lib/api";
+import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -88,17 +90,11 @@ export default function ProfilePage() {
     );
 
   return (
-    <div className="min-h-screen bg-muted">
-      <div className="bg-card border-b px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back
-          </button>
-          <h1 className="font-bold text-lg">DockCampus</h1>
-        </div>
-      </div>
-
-      <div className="max-w-2xl mx-auto px-6 py-10 space-y-8">
+    <div className="min-h-screen bg-zinc-950">
+      <Navbar user={user} />
+      <div className="flex">
+        <Sidebar user={user} />
+        <div className="flex-1 max-w-2xl px-6 py-10 space-y-8">
         <div className="bg-card border rounded-xl p-6 space-y-4">
           <h2 className="font-semibold text-lg">Account Overview</h2>
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -224,6 +220,7 @@ export default function ProfilePage() {
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>

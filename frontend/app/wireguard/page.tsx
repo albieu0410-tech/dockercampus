@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 import {
   getMe,
   getWireGuardStatus,
@@ -51,7 +52,9 @@ export default function WireGuardPage() {
   return (
     <div className="page-shell">
       <Navbar user={user} />
-      <main className="page stack-y-6">
+      <div className="flex">
+        <Sidebar user={user} />
+        <main className="page stack-y-6 flex-1">
         <div className="flex-between" style={{ flexWrap: "wrap" }}>
           <div>
             <div className="label-ups">WireGuard</div>
@@ -105,7 +108,8 @@ export default function WireGuardPage() {
             </div>
           )}
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

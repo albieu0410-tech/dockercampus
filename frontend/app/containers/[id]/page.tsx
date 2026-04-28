@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getMe, listContainers, containerAction, deleteContainer, type User, type Container } from "@/lib/api";
 import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 import { useRouter } from "next/navigation";
 
 export default function ContainerDetailPage() {
@@ -41,9 +42,11 @@ export default function ContainerDetailPage() {
   const isRunning = container.status === "running";
 
   return (
-    <div className="min-h-screen bg-muted">
+    <div className="min-h-screen bg-zinc-950">
       <Navbar user={user} />
-      <main className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+      <div className="flex">
+        <Sidebar user={user} />
+        <main className="flex-1 max-w-3xl px-6 py-8 space-y-6">
         <button onClick={() => router.back()} className="text-sm text-muted-foreground hover:underline">← Back</button>
 
         <div className="bg-card border rounded-xl p-6 space-y-4">
@@ -81,7 +84,8 @@ export default function ContainerDetailPage() {
             <button onClick={doDelete} className="text-sm bg-destructive text-destructive-foreground px-4 py-2 rounded-md hover:opacity-90">Delete</button>
           </div>
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

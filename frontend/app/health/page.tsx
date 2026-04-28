@@ -1,5 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
+import { getMe, type User } from "@/lib/api";
+import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 
 type ServiceStatus = {
   status: string;
@@ -34,6 +37,7 @@ function StatusDot({ status }: { status: string }) {
 }
 
 export default function HealthPage() {
+  const [user, setUser] = useState<User | null>(null);
   const [data, setData] = useState<HealthData | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [error, setError] = useState(false);
@@ -60,6 +64,12 @@ export default function HealthPage() {
   }
 
   useEffect(() => {
+    getMe().then(setUser).catch(() => {
+      window.location.href = "/login";
+    });
+  }, []);
+
+  useEffect(() => {
     check();
     const id = setInterval(check, interval * 1000);
     return () => clearInterval(id);
@@ -68,12 +78,12 @@ export default function HealthPage() {
   const overallOk = !error && data?.status === "ok";
 
   return (
-    <div
-      className="min-h-screen bg-zinc-950 text-zinc-100 p-4 sm:p-8"
-      style={{ fontFamily: "'IBM Plex Mono', monospace" }}
-    >
+    <div className="min-h-screen bg-zinc-950 text-zinc-100" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Syne:wght@700;800&display=swap');`}</style>
-
+      {user && <Navbar user={user} />}
+      <div className="flex">
+        {user && <Sidebar user={user} />}
+        <div className="flex-1 p-4 sm:p-8">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <div>
@@ -202,6 +212,8 @@ export default function HealthPage() {
           <a href="/dashboard" className="hover:text-zinc-500">
             Back to dashboard
           </a>
+        </div>
+      </div>
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, RefreshCw, Crown } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 import { getHiveJoinInfo, getMe, listHiveNodes, type HiveNode, type User } from "@/lib/api";
 
 type HiveNodeView = HiveNode;
@@ -52,7 +53,9 @@ export default function HivePage() {
   return (
     <div className="page-shell">
       <Navbar user={user} />
-      <main className="page stack-y-6">
+      <div className="flex">
+        <Sidebar user={user} />
+        <main className="page stack-y-6 flex-1">
         <div className="flex-between" style={{ flexWrap: "wrap" }}>
           <div>
             <div className="label-ups">Hive</div>
@@ -113,7 +116,8 @@ export default function HivePage() {
             <p className="mono" style={{ fontSize: 12 }}>Join token: {joinToken || "Pending backend"}</p>
           </div>
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MoonStar, RefreshCw } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 import {
   getMe,
   getSleepStatus,
@@ -59,7 +60,9 @@ export default function SleepPage() {
   return (
     <div className="page-shell">
       <Navbar user={user} />
-      <main className="page stack-y-6">
+      <div className="flex">
+        <Sidebar user={user} />
+        <main className="page stack-y-6 flex-1">
         <div className="flex-between" style={{ flexWrap: "wrap" }}>
           <div>
             <div className="label-ups">Container Sleep</div>
@@ -117,7 +120,8 @@ export default function SleepPage() {
             ))
           )}
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

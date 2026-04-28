@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Zap } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 import {
   getMe,
   getRoutingState,
@@ -85,7 +86,9 @@ export default function RoutingPage() {
   return (
     <div className="page-shell">
       <Navbar user={user} />
-      <main className="page stack-y-6">
+      <div className="flex">
+        <Sidebar user={user} />
+        <main className="page stack-y-6 flex-1">
         <div className="flex-between" style={{ flexWrap: "wrap" }}>
           <div>
             <div className="label-ups">Deployment / Routing</div>
@@ -177,7 +180,8 @@ export default function RoutingPage() {
             </>
           )}
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
