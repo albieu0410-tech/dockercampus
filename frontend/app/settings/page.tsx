@@ -10,11 +10,7 @@ export default function SettingsPage() {
     getMe().then(setUser);
   }, []);
 
-  if (!user) return (
-    <div className="min-h-screen flex items-center justify-center bg-muted">
-      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  if (!user) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-muted">
