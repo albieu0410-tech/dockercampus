@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { register } from "@/lib/api";
@@ -34,29 +33,70 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="page-shell" style={{ display: "grid", placeItems: "center", padding: 16 }}>
-      <div className="card" style={{ width: "100%", maxWidth: 460, padding: 28 }}>
-        <div className="stack-y-2">
-          <div className="label-ups">DockCampus</div>
-          <h2>Create account</h2>
-          <p>Use your invite code to register.</p>
+    <div className="min-h-screen flex items-center justify-center bg-muted">
+      <div className="bg-card border rounded-xl shadow-sm p-8 w-full max-w-md space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">DockCampus</h1>
+          <p className="text-muted-foreground text-sm mt-1">Create your account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="stack-y-3" style={{ marginTop: 18 }}>
-          <input type="text" value={form.full_name} onChange={(e) => update("full_name", e.target.value)} className="input" placeholder="Full name" required />
-          <input type="email" value={form.email} onChange={(e) => update("email", e.target.value)} className="input" placeholder="Email" required />
-          <input type="password" value={form.password} onChange={(e) => update("password", e.target.value)} className="input" placeholder="Password" required />
-          <input type="text" value={form.invite_code} onChange={(e) => update("invite_code", e.target.value)} className="input" placeholder="Invite code" required />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Full name</label>
+            <input
+              type="text"
+              value={form.full_name}
+              onChange={(e) => update("full_name", e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Email</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => update("email", e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Password</label>
+            <input
+              type="password"
+              value={form.password}
+              onChange={(e) => update("password", e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Invite code</label>
+            <input
+              type="text"
+              value={form.invite_code}
+              onChange={(e) => update("invite_code", e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="Enter your invite code"
+              required
+            />
+          </div>
 
-          {error && <p style={{ color: "#fca5a5", fontSize: 13 }}>{error}</p>}
+          {error && <p className="text-destructive text-sm">{error}</p>}
 
-          <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%" }}>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-primary text-primary-foreground rounded-md py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
+          >
             {loading ? "Creating account..." : "Create account"}
           </button>
         </form>
 
-        <p style={{ marginTop: 16, fontSize: 13 }}>
-          Already have an account? <a href="/login">Sign in</a>
+        <p className="text-sm text-center text-muted-foreground">
+          Already have an account?{" "}
+          <a href="/login" className="text-primary hover:underline">Sign in</a>
         </p>
       </div>
     </div>

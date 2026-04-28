@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   getMe, listStudents, listContainers, createContainer,
-  containerAction, deleteContainer, createDeployment, listDeployments, cancelDeployment,
+  containerAction, deleteContainer, createDeployment, listDeployments,
   type User, type Container, type Deployment
 } from "@/lib/api";
 import Navbar from "@/components/Navbar";
@@ -73,15 +73,6 @@ export default function ProfessorPage() {
         repo_url: retryRepoUrl,
         custom_port: port ?? undefined,
       });
-      await load();
-    } catch (err: any) {
-      console.error(err);
-    }
-  }
-
-  async function stopDeployment(deploymentId: string) {
-    try {
-      await cancelDeployment(deploymentId);
       await load();
     } catch (err: any) {
       console.error(err);
@@ -338,27 +329,18 @@ export default function ProfessorPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                         d.status === "running" ? "bg-green-100 text-green-700" :
-                        d.status === "failed" || d.status === "cancelled" ? "bg-red-100 text-red-700" :
+                        d.status === "failed" ? "bg-red-100 text-red-700" :
                         "bg-yellow-100 text-yellow-700"
                       }`}>
                         {d.status}
                       </span>
-                      {(d.status === "failed" || d.status === "error" || d.status === "cancelled") && (
+                      {(d.status === "failed" || d.status === "error") && (
                         <button
                           type="button"
                           onClick={() => retryDeployment(d.id, d.repo_url, d.custom_port)}
                           className="text-xs bg-primary text-primary-foreground px-3 py-1 rounded-md hover:opacity-90"
                         >
                           ↺ Retry
-                        </button>
-                      )}
-                      {["pending", "cloning", "detecting", "building", "starting", "running"].includes(d.status) && (
-                        <button
-                          type="button"
-                          onClick={() => stopDeployment(d.id)}
-                          className="text-xs bg-muted text-foreground px-3 py-1 rounded-md hover:opacity-90"
-                        >
-                          Cancel
                         </button>
                       )}
                     </div>

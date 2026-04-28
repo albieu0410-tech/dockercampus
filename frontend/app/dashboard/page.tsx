@@ -1,27 +1,13 @@
 "use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { Github, Plus, Rocket, RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
-  getMe,
-  listContainers,
-  createContainer,
-  getGithubStatus,
-  listRepos,
-  createDeployment,
-  cancelDeployment,
-  listDeployments,
-  apiUrl,
-  type User,
-  type Container,
-  type Deployment,
-  type Repo,
+  getMe, listContainers, createContainer,
+  getGithubStatus, listRepos, createDeployment, listDeployments,
+  type User, type Container, type Deployment, type Repo
 } from "@/lib/api";
 import Navbar from "@/components/Navbar";
 import ContainerCard from "@/components/ContainerCard";
 import RepoInspector from "@/components/RepoInspector";
-
-type Tab = "containers" | "deploy" | "deployments";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -34,7 +20,7 @@ export default function DashboardPage() {
   const [customPort, setCustomPort] = useState("");
   const [selectedRepo, setSelectedRepo] = useState("");
   const [deploying, setDeploying] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("containers");
+  const [activeTab, setActiveTab] = useState<"containers" | "deploy" | "deployments">("containers");
 
   async function load() {
     const [me, conts] = await Promise.all([getMe(), listContainers()]);
@@ -47,19 +33,13 @@ export default function DashboardPage() {
         setGithubConnected(true);
         const repoList = await listRepos();
         setRepos(repoList);
-      } else {
-        setGithubConnected(false);
       }
-    } catch {
-      setGithubConnected(false);
-    }
+    } catch {}
 
     try {
       const deps = await listDeployments();
       setDeployments(deps);
-    } catch {
-      setDeployments([]);
-    }
+    } catch {}
   }
 
   useEffect(() => {
@@ -89,7 +69,7 @@ export default function DashboardPage() {
       if (!url) return;
       await createDeployment({
         repo_url: url,
-        custom_port: customPort ? parseInt(customPort, 10) : undefined,
+        custom_port: customPort ? parseInt(customPort) : undefined,
       });
       setRepoUrl("");
       setSelectedRepo("");
@@ -102,74 +82,82 @@ export default function DashboardPage() {
   }
 
   async function retryDeployment(_deploymentId: string, retryRepoUrl: string, port?: number | null) {
-    await createDeployment({ repo_url: retryRepoUrl, custom_port: port ?? undefined });
-    await load();
+    try {
+      await createDeployment({
+        repo_url: retryRepoUrl,
+        custom_port: port ?? undefined,
+      });
+      await load();
+    } catch (err: any) {
+      console.error(err);
+    }
   }
 
-  async function stopDeployment(deploymentId: string) {
-    await cancelDeployment(deploymentId);
-    await load();
-  }
-
-  const runningCount = useMemo(() => containers.filter((c) => c.status === "running").length, [containers]);
-
-  if (!user) {
-    return (
-      <div className="page-shell" style={{ display: "grid", placeItems: "center" }}>
-        <p>Loading...</p>
-      </div>
-    );
-  }
+  if (!user) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <p className="text-muted-foreground">Loading...</p>
+    </div>
+  );
 
   const hasContainer = containers.length > 0;
 
   return (
-    <div className="page-shell">
+    <div className="min-h-screen bg-muted">
       <Navbar user={user} />
-      <main className="page stack-y-6">
-        <div className="flex-between" style={{ flexWrap: "wrap" }}>
+      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+
+        <div className="flex items-center justify-between">
           <div>
-            <div className="label-ups">Dashboard</div>
-            <h2 style={{ marginTop: 6 }}>Welcome back, {user.full_name}</h2>
+            <h2 className="text-xl font-bold">Dashboard</h2>
+            <p className="text-muted-foreground text-sm">Welcome back, {user.full_name}</p>
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {!hasContainer && (
-              <button className="btn btn-primary" onClick={handleCreate} disabled={creating} type="button">
-                <Plus size={14} /> {creating ? "Creating..." : "Create Environment"}
-              </button>
-            )}
-            <button className="btn btn-secondary" onClick={() => setActiveTab("deploy")} type="button">
-              <Rocket size={14} /> New deployment
+          {!hasContainer && (
+            <button
+              onClick={handleCreate}
+              disabled={creating}
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
+            >
+              {creating ? "Creating..." : "Create Environment"}
             </button>
+          )}
+        </div>
+
+        {hasContainer && (
+          <div className="flex gap-2 border-b">
+            {["containers", "deploy", "deployments"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as "containers" | "deploy" | "deployments")}
+                className={`px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors ${
+                  activeTab === tab
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
-          <div className="card card-pad"><div className="label-ups">Containers</div><h3 style={{ marginTop: 6 }}>{containers.length}</h3></div>
-          <div className="card card-pad"><div className="label-ups">Running</div><h3 style={{ marginTop: 6 }}>{runningCount}</h3></div>
-          <div className="card card-pad"><div className="label-ups">Deployments</div><h3 style={{ marginTop: 6 }}>{deployments.length}</h3></div>
-        </div>
-
-        <div className="tabs">
-          <button className={`tab ${activeTab === "containers" ? "active" : ""}`} onClick={() => setActiveTab("containers")}>Containers</button>
-          <button className={`tab ${activeTab === "deploy" ? "active" : ""}`} onClick={() => setActiveTab("deploy")}>Deploy</button>
-          <button className={`tab ${activeTab === "deployments" ? "active" : ""}`} onClick={() => setActiveTab("deployments")}>Deployments ({deployments.length})</button>
-        </div>
+        )}
 
         {activeTab === "containers" && (
-          <div>
+          <div className="space-y-4">
             {containers.length === 0 ? (
-              <div className="card card-pad stack-y-3" style={{ textAlign: "center", padding: 42 }}>
-                <p style={{ color: "var(--text)", fontWeight: 500 }}>No environment yet</p>
-                <p>Create your development environment to get started.</p>
-                <div>
-                  <button className="btn btn-primary" onClick={handleCreate} disabled={creating} type="button">
-                    <Plus size={14} /> {creating ? "Creating..." : "Create Environment"}
-                  </button>
-                </div>
+              <div className="bg-card border rounded-xl p-8 text-center space-y-3">
+                <p className="font-medium">No environment yet</p>
+                <p className="text-muted-foreground text-sm">
+                  Create your development environment to get started
+                </p>
+                <button
+                  onClick={handleCreate}
+                  disabled={creating}
+                  className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {creating ? "Creating..." : "Create Environment"}
+                </button>
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {containers.map((c) => (
                   <ContainerCard key={c.id} container={c} onRefresh={load} />
                 ))}
@@ -178,28 +166,39 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {activeTab === "deploy" && (
-          <div className="stack-y-4">
+        {activeTab === "deploy" && hasContainer && (
+          <div className="space-y-6">
             {!githubConnected ? (
-              <div className="card card-pad stack-y-3">
-                <h3>Connect GitHub</h3>
-                <p>Connect your GitHub account to deploy from your repositories.</p>
+              <div className="bg-card border rounded-xl p-6 space-y-4">
                 <div>
-                  <a href={`${apiUrl("/auth/github/login")}?token=${typeof window !== "undefined" ? localStorage.getItem("token") : ""}`} className="btn btn-primary">
-                    <Github size={14} /> Connect GitHub
+                  <h3 className="font-semibold">Connect GitHub</h3>
+                  <p className="text-muted-foreground text-sm mt-1">
+                    Connect your GitHub account to deploy from your repositories
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <a
+                    href={`https://api.sudelca.com/auth/github/login?token=${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}`}
+                    className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90"
+                  >
+                    Connect GitHub
                   </a>
                 </div>
               </div>
             ) : (
-              <div className="card card-pad">
-                <div className="status-dot status-running">
-                  <span className="status-dot-circle" /> GitHub connected
-                </div>
+              <div className="bg-card border rounded-xl p-2 px-3 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500"/>
+                <p className="text-sm text-muted-foreground">GitHub connected</p>
               </div>
             )}
 
-            <div className="card card-pad stack-y-4">
-              <h3>Step 1 - Browse repository</h3>
+            <div className="bg-card border rounded-xl p-6 space-y-4">
+              <div>
+                <h3 className="font-semibold">Step 1 — Browse repository</h3>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Enter a repo URL and select a Dockerfile to use
+                </p>
+              </div>
               <RepoInspector
                 onSelectDockerfile={(_dockerfilePath, selectedRepoUrl) => {
                   setRepoUrl(selectedRepoUrl);
@@ -208,56 +207,68 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div className="card card-pad stack-y-4">
-              <h3>Step 2 - Deploy</h3>
-              <form onSubmit={handleDeploy} className="stack-y-3">
+            <div className="bg-card border rounded-xl p-6 space-y-4">
+              <div>
+                <h3 className="font-semibold">Step 2 — Deploy</h3>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Configure and deploy your project
+                </p>
+              </div>
+
+              <form onSubmit={handleDeploy} className="space-y-4">
                 {githubConnected && repos.length > 0 && (
-                  <div className="stack-y-2">
-                    <label className="label-ups">Select from your repos</label>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Or select from your repos</label>
                     <select
                       value={selectedRepo}
                       onChange={(e) => {
                         setSelectedRepo(e.target.value);
                         setRepoUrl("");
                       }}
-                      className="input"
+                      className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                     >
-                      <option value="">-- Choose repository --</option>
+                      <option value="">-- Choose a repository --</option>
                       {repos.map((r) => (
                         <option key={r.full_name} value={r.url}>
-                          {r.full_name} {r.private ? "(private)" : ""}
+                          {r.full_name} {r.private ? "🔒" : ""}
                         </option>
                       ))}
                     </select>
                   </div>
                 )}
 
-                <div className="stack-y-2">
-                  <label className="label-ups">Repository URL</label>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Repository URL</label>
                   <input
                     value={repoUrl}
-                    onChange={(e) => {
-                      setRepoUrl(e.target.value);
-                      setSelectedRepo("");
-                    }}
+                    onChange={(e) => { setRepoUrl(e.target.value); setSelectedRepo(""); }}
                     placeholder="https://github.com/username/repo"
-                    className="input"
+                    className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                   />
+                  {repoUrl && (
+                    <p className="text-xs text-green-600">✓ Repo selected: {repoUrl}</p>
+                  )}
                 </div>
 
-                <div className="stack-y-2">
-                  <label className="label-ups">Port (optional)</label>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">
+                    Port <span className="text-muted-foreground">(auto-detected if empty)</span>
+                  </label>
                   <input
                     value={customPort}
                     onChange={(e) => setCustomPort(e.target.value)}
                     type="number"
+                    className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="3000"
-                    className="input"
                   />
                 </div>
 
-                <button type="submit" disabled={deploying || (!repoUrl && !selectedRepo)} className="btn btn-primary">
-                  <Rocket size={14} /> {deploying ? "Deploying..." : "Deploy"}
+                <button
+                  type="submit"
+                  disabled={deploying || (!repoUrl && !selectedRepo)}
+                  className="w-full bg-primary text-primary-foreground py-2 rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {deploying ? "Deploying..." : "Deploy"}
                 </button>
               </form>
             </div>
@@ -265,55 +276,68 @@ export default function DashboardPage() {
         )}
 
         {activeTab === "deployments" && (
-          <div className="stack-y-3">
+          <div className="space-y-4">
             {deployments.length === 0 ? (
-              <div className="card card-pad" style={{ textAlign: "center", padding: 38 }}>
-                No deployments yet.
+              <div className="bg-card border rounded-xl p-8 text-center">
+                <p className="text-muted-foreground text-sm">No deployments yet</p>
               </div>
             ) : (
-              deployments.map((d) => (
-                <div key={d.id} className="card card-pad stack-y-3">
-                  <div className="flex-between" style={{ alignItems: "flex-start", flexWrap: "wrap" }}>
-                    <div>
-                      <p className="mono" style={{ color: "var(--text)", fontSize: 13 }}>{d.repo_url}</p>
-                      <p className="mono" style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4 }}>
-                        Port: {d.custom_port || d.detected_port || "auto"}
-                      </p>
+              <div className="space-y-3">
+                {deployments.map((d) => (
+                  <div key={d.id} className="bg-card border rounded-xl p-5 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate max-w-xs">{d.repo_url}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Port: {d.custom_port || d.detected_port || "auto"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          d.status === "running" ? "bg-green-100 text-green-700" :
+                          d.status === "failed" ? "bg-red-100 text-red-700" :
+                          "bg-yellow-100 text-yellow-700"
+                        }`}>
+                          {d.status}
+                        </span>
+                        {(d.status === "failed" || d.status === "error") && (
+                          <button
+                            type="button"
+                            onClick={() => retryDeployment(d.id, d.repo_url, d.custom_port)}
+                            className="text-xs bg-primary text-primary-foreground px-3 py-1 rounded-md hover:opacity-90"
+                          >
+                            ↺ Retry
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span className={`status-dot ${d.status === "running" ? "status-running" : d.status === "failed" || d.status === "cancelled" ? "status-error" : "status-building"}`}>
-                        <span className="status-dot-circle" /> {d.status}
-                      </span>
-                      {(d.status === "failed" || d.status === "error" || d.status === "cancelled") && (
-                        <button type="button" onClick={() => retryDeployment(d.id, d.repo_url, d.custom_port)} className="btn btn-secondary btn-sm">
-                          <RotateCcw size={12} /> Retry
-                        </button>
-                      )}
-                      {["pending", "cloning", "detecting", "building", "starting", "running"].includes(d.status) && (
-                        <button type="button" onClick={() => stopDeployment(d.id)} className="btn btn-ghost btn-sm">
-                          Cancel
-                        </button>
-                      )}
-                    </div>
+                    {d.public_url && (
+                      <a
+                        href={d.public_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-primary hover:underline truncate"
+                      >
+                        {d.public_url}
+                      </a>
+                    )}
+                    {d.build_logs && (
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                          View build logs
+                        </summary>
+                        <pre className="mt-2 bg-muted rounded p-3 overflow-x-auto text-xs whitespace-pre-wrap max-h-48">
+                          {d.build_logs}
+                        </pre>
+                      </details>
+                    )}
                   </div>
-
-                  {d.public_url && (
-                    <a href={d.public_url} target="_blank" rel="noopener noreferrer" className="mono" style={{ fontSize: 12 }}>
-                      {d.public_url}
-                    </a>
-                  )}
-
-                  {d.build_logs && (
-                    <details>
-                      <summary className="label-ups" style={{ cursor: "pointer" }}>View build logs</summary>
-                      <pre className="code" style={{ marginTop: 10 }}>{d.build_logs}</pre>
-                    </details>
-                  )}
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         )}
+
       </main>
     </div>
   );
