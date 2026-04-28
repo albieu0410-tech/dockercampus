@@ -26,16 +26,16 @@ function HealthBadge() {
   }, []);
 
   const config = {
-    ok: { dot: "bg-green-500 animate-pulse", text: "text-green-600", label: "All systems operational" },
-    degraded: { dot: "bg-yellow-500 animate-pulse", text: "text-yellow-600", label: "Degraded" },
-    error: { dot: "bg-red-500", text: "text-red-600", label: "Service down" },
-    loading: { dot: "bg-zinc-400", text: "text-zinc-400", label: "Checking..." },
+    ok: { dot: "bg-green-500 animate-pulse", text: "text-green-400", label: "All systems operational" },
+    degraded: { dot: "bg-yellow-500 animate-pulse", text: "text-yellow-400", label: "Degraded" },
+    error: { dot: "bg-red-500", text: "text-red-400", label: "Service down" },
+    loading: { dot: "bg-zinc-600", text: "text-zinc-500", label: "Checking..." },
   }[status];
 
   return (
     <a
       href="/health"
-      className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-zinc-200 hover:border-zinc-300 transition-colors"
+      className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-zinc-800 hover:border-zinc-600 transition-colors"
       title="View system status"
     >
       <span className={`w-2 h-2 rounded-full shrink-0 ${config.dot}`} />
@@ -79,16 +79,16 @@ export default function Navbar({ user }: { user: User }) {
       ];
 
   return (
-    <header className="border-b bg-card px-4 sm:px-6 py-3">
+    <header className="border-b border-zinc-800 bg-zinc-950 text-zinc-100 px-4 sm:px-6 py-3">
       <div className="max-w-6xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <span className="font-bold text-lg">DockCampus</span>
+          <span className="font-bold text-lg text-zinc-100">DockCampus</span>
           <nav className="hidden sm:flex items-center gap-4">
             {navLinks.map((l) => (
               <a
                 key={l.href}
                 href={l.href}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors"
               >
                 {l.label}
               </a>
@@ -98,32 +98,32 @@ export default function Navbar({ user }: { user: User }) {
 
         <div className="hidden sm:flex items-center gap-3">
           <HealthBadge />
-          <a href="/profile" className="text-sm text-muted-foreground hover:underline">
+          <a href="/profile" className="text-sm text-zinc-400 hover:text-zinc-100 hover:underline">
             {user.full_name}
           </a>
-          <span className="text-xs bg-muted px-2 py-1 rounded-full capitalize">{user.role}</span>
-          <button onClick={logout} className="text-sm text-destructive hover:underline">
+          <span className="text-xs bg-zinc-800 text-zinc-300 px-2 py-1 rounded-full capitalize">{user.role}</span>
+          <button onClick={logout} className="text-sm text-red-400 hover:text-red-300 hover:underline">
             Logout
           </button>
         </div>
 
         <button
-          className="sm:hidden p-2 rounded-md hover:bg-muted"
+          className="sm:hidden p-2 rounded-md hover:bg-zinc-900"
           onClick={() => setMenuOpen(!menuOpen)}
         >
-          <div className="w-5 h-0.5 bg-foreground mb-1" />
-          <div className="w-5 h-0.5 bg-foreground mb-1" />
-          <div className="w-5 h-0.5 bg-foreground" />
+          <div className="w-5 h-0.5 bg-zinc-200 mb-1" />
+          <div className="w-5 h-0.5 bg-zinc-200 mb-1" />
+          <div className="w-5 h-0.5 bg-zinc-200" />
         </button>
       </div>
 
       {menuOpen && (
-        <div className="sm:hidden border-t mt-3 pt-3 pb-2 space-y-1 px-4">
+        <div className="sm:hidden border-t border-zinc-800 mt-3 pt-3 pb-2 space-y-1 px-4 bg-zinc-950">
           {navLinks.map((l) => (
             <a
               key={l.href}
               href={l.href}
-              className="block py-2 text-sm text-muted-foreground hover:text-foreground"
+              className="block py-2 text-sm text-zinc-400 hover:text-zinc-100"
               onClick={() => setMenuOpen(false)}
             >
               {l.label}
@@ -131,20 +131,20 @@ export default function Navbar({ user }: { user: User }) {
           ))}
           <a
             href="/health"
-            className="block py-2 text-sm text-muted-foreground hover:text-foreground"
+            className="block py-2 text-sm text-zinc-400 hover:text-zinc-100"
             onClick={() => setMenuOpen(false)}
           >
             System Status
           </a>
           <a
             href="/profile"
-            className="block py-2 text-sm text-muted-foreground hover:text-foreground"
+            className="block py-2 text-sm text-zinc-400 hover:text-zinc-100"
             onClick={() => setMenuOpen(false)}
           >
             Profile ({user.full_name})
           </a>
-          <div className="pt-1 border-t">
-            <button onClick={logout} className="py-2 text-sm text-destructive hover:underline">
+          <div className="pt-1 border-t border-zinc-800">
+            <button onClick={logout} className="py-2 text-sm text-red-400 hover:text-red-300 hover:underline">
               Logout
             </button>
           </div>
