@@ -108,7 +108,7 @@ async fn list_containers(State(state): State<Arc<AppState>>) -> Result<Json<serd
     let containers = sqlx::query(
         r#"
         SELECT c.id, c.user_id, c.docker_container_id,
-               c.port, c.status,
+               c.port, c.status::text as status,
                c.cpu_limit, c.memory_limit_mb, c.created_at
         FROM containers c
         ORDER BY c.created_at DESC
