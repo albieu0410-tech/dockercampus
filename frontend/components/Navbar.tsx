@@ -57,8 +57,26 @@ export default function Navbar({ user }: { user: User }) {
   const navLinks = user.role === "admin"
     ? [{ href: "/admin", label: "Admin" }, { href: "/dashboard", label: "Dashboard" }]
     : user.role === "professor"
-    ? [{ href: "/professor", label: "Dashboard" }]
-    : [{ href: "/dashboard", label: "Dashboard" }];
+    ? [
+        { href: "/professor", label: "Dashboard" },
+        { href: "/health", label: "Health" },
+        { href: "/hive", label: "Hive" },
+        { href: "/routing", label: "Routing" },
+        { href: "/jobs", label: "Jobs" },
+        { href: "/sleep", label: "Sleep" },
+        { href: "/wireguard", label: "WireGuard" },
+        { href: "/settings", label: "Settings" },
+      ]
+    : [
+        { href: "/dashboard", label: "Dashboard" },
+        { href: "/health", label: "Health" },
+        { href: "/hive", label: "Hive" },
+        { href: "/routing", label: "Routing" },
+        { href: "/jobs", label: "Jobs" },
+        { href: "/sleep", label: "Sleep" },
+        { href: "/wireguard", label: "WireGuard" },
+        { href: "/settings", label: "Settings" },
+      ];
 
   return (
     <header className="border-b bg-card px-4 sm:px-6 py-3">
