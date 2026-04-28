@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clearToken } from "@/lib/auth";
 import type { User } from "@/lib/api";
@@ -25,27 +26,65 @@ function HealthBadge() {
     return () => clearInterval(id);
   }, []);
 
-  const config = {
-    ok: { dot: "bg-green-500 animate-pulse", text: "text-green-400", label: "All systems operational" },
-    degraded: { dot: "bg-yellow-500 animate-pulse", text: "text-yellow-400", label: "Degraded" },
-    error: { dot: "bg-red-500", text: "text-red-400", label: "Service down" },
-    loading: { dot: "bg-zinc-600", text: "text-zinc-500", label: "Checking..." },
-  }[status];
+  const colorMap: Record<HealthStatus, string> = {
+    ok: "#22c55e",
+    degraded: "#eab308",
+    error: "#ef4444",
+    loading: "#52525b",
+  };
+  const labelMap: Record<HealthStatus, string> = {
+    ok: "All systems operational",
+    degraded: "Degraded",
+    error: "Service down",
+    loading: "Checking…",
+  };
 
   return (
     <a
       href="/health"
-      className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-zinc-800 hover:border-zinc-600 transition-colors"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "4px 10px",
+        borderRadius: 20,
+        border: "1px solid var(--border)",
+        textDecoration: "none",
+        transition: "border-color 150ms",
+        fontSize: 12,
+        color: "var(--text-secondary)",
+        fontFamily: "'Geist Mono', monospace",
+      }}
       title="View system status"
     >
-      <span className={`w-2 h-2 rounded-full shrink-0 ${config.dot}`} />
-      <span className={`text-xs font-medium ${config.text}`}>{config.label}</span>
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          background: colorMap[status],
+          flexShrink: 0,
+          animation: status === "ok" || status === "degraded" ? "pulse 2s infinite" : undefined,
+        }}
+      />
+      {labelMap[status]}
     </a>
   );
 }
 
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
 export default function Navbar({ user }: { user: User }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   function logout() {
     clearToken();
@@ -53,23 +92,127 @@ export default function Navbar({ user }: { user: User }) {
     router.push("/login");
   }
 
-  return (
-    <header className="border-b border-zinc-800 bg-zinc-950 text-zinc-100 px-4 sm:px-6 py-3">
-      <div className="max-w-6xl mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-orange-500 rounded flex items-center justify-center text-white font-bold text-sm shrink-0">D</div>
-          <span className="font-bold text-lg text-zinc-100">DockCampus</span>
-        </div>
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
 
-        <div className="flex items-center gap-3">
+  return (
+    <header className="navbar">
+      <div className="navbar-inner">
+        {/* Brand */}
+        <a href="/dashboard" className="brand" style={{ textDecoration: "none" }}>
+          <div className="brand-mark">
+            <span className="brand-mark-letter">D</span>
+          </div>
+          <span className="brand-word">dockcampus</span>
+        </a>
+
+        {/* Right side */}
+        <div className="nav-right">
           <HealthBadge />
-          <a href="/profile" className="text-sm text-zinc-400 hover:text-zinc-100 hover:underline hidden sm:inline">
-            {user.full_name}
-          </a>
-          <span className="text-xs bg-zinc-800 text-zinc-300 px-2 py-1 rounded-full capitalize hidden sm:inline">{user.role}</span>
-          <button onClick={logout} className="text-sm text-red-400 hover:text-red-300 hover:underline">
-            Logout
-          </button>
+
+          {/* Avatar + dropdown */}
+          <div ref={ref} style={{ position: "relative" }}>
+            <div
+              className="avatar"
+              onClick={() => setOpen((o) => !o)}
+              title={user.full_name}
+            >
+              {initials(user.full_name)}
+            </div>
+
+            {open && (
+              <div className="dropdown" style={{ minWidth: 220 }}>
+                {/* User info header */}
+                <div
+                  style={{
+                    padding: "10px 12px 12px",
+                    borderBottom: "1px solid var(--border)",
+                    marginBottom: 4,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "var(--text)",
+                      marginBottom: 2,
+                    }}
+                  >
+                    {user.full_name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-muted)",
+                      fontFamily: "'Geist Mono', monospace",
+                    }}
+                  >
+                    {user.email}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 6,
+                      display: "inline-block",
+                      fontSize: 10,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                      padding: "2px 7px",
+                      borderRadius: 4,
+                      background: "var(--accent-muted)",
+                      color: "var(--accent)",
+                      fontFamily: "'Geist Mono', monospace",
+                    }}
+                  >
+                    {user.role}
+                  </div>
+                </div>
+
+                <a
+                  href="/profile"
+                  className="dropdown-item"
+                  style={{ textDecoration: "none" }}
+                  onClick={() => setOpen(false)}
+                >
+                  Profile
+                </a>
+                <a
+                  href="/settings"
+                  className="dropdown-item"
+                  style={{ textDecoration: "none" }}
+                  onClick={() => setOpen(false)}
+                >
+                  Settings
+                </a>
+
+                <div
+                  style={{
+                    borderTop: "1px solid var(--border)",
+                    marginTop: 4,
+                    paddingTop: 4,
+                  }}
+                >
+                  <div
+                    className="dropdown-item"
+                    style={{ color: "var(--error)" }}
+                    onClick={() => {
+                      setOpen(false);
+                      logout();
+                    }}
+                  >
+                    Sign out
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>
