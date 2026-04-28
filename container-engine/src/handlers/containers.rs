@@ -116,8 +116,23 @@ async fn list_containers(State(state): State<Arc<AppState>>) -> Result<Json<serd
     )
     .fetch_all(&state.db)
     .await?;
+    let out = containers
+        .into_iter()
+        .map(|row| {
+            Ok(serde_json::json!({
+                "id": row.try_get::<Uuid, _>("id")?.to_string(),
+                "user_id": row.try_get::<Uuid, _>("user_id")?.to_string(),
+                "docker_container_id": row.try_get::<Option<String>, _>("docker_container_id")?,
+                "port": row.try_get::<i32, _>("port")?,
+                "status": row.try_get::<String, _>("status")?,
+                "cpu_limit": row.try_get::<f64, _>("cpu_limit")?,
+                "memory_limit_mb": row.try_get::<i32, _>("memory_limit_mb")?,
+                "created_at": row.try_get::<chrono::DateTime<chrono::Utc>, _>("created_at")?.to_rfc3339(),
+            }))
+        })
+        .collect::<Result<Vec<_>>>()?;
 
-    Ok(Json(serde_json::json!({ "containers": containers.len() })))
+    Ok(Json(serde_json::Value::Array(out)))
 }
 
 async fn create_container(
