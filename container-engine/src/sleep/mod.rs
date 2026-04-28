@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::Row;
+use uuid::Uuid;
 
 use crate::{errors::Result, state::AppState};
 
@@ -13,7 +14,7 @@ pub struct SleepConfig {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SleepCandidate {
-    pub user_id: String,
+    pub user_id: Uuid,
     pub docker_container_id: Option<String>,
     pub last_activity: String,
 }
@@ -111,8 +112,9 @@ pub async fn list_idle_candidates(state: &AppState, limit: i64) -> Result<Vec<Sl
     rows.into_iter()
         .map(|row| {
             let last_activity: DateTime<Utc> = row.try_get("last_activity")?;
+            let user_id: Uuid = row.try_get("user_id")?;
             Ok(SleepCandidate {
-                user_id: row.try_get("user_id")?,
+                user_id,
                 docker_container_id: row.try_get("docker_container_id")?,
                 last_activity: last_activity.to_rfc3339(),
             })
