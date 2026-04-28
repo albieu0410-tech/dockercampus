@@ -1,65 +1,29 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getMe } from "@/lib/api";
+import { getMe, type User } from "@/lib/api";
+import Navbar from "@/components/Navbar";
 import UsersTab from "./components/UsersTab";
 import InviteCodesTab from "./components/InviteCodesTab";
 import ContainersTab from "./components/ContainersTab";
 
 type Tab = "users" | "invites" | "containers" | "health" | "hive" | "routing" | "jobs" | "sleep" | "wireguard";
 
-function AdminHealthBadge() {
-  const [status, setStatus] = useState<"ok" | "degraded" | "error" | "loading">("loading");
-
-  async function check() {
-    try {
-      const resp = await fetch("https://api.sudelca.com/health");
-      const data = await resp.json();
-      setStatus(data.status === "ok" ? "ok" : "degraded");
-    } catch {
-      setStatus("error");
-    }
-  }
-
-  useEffect(() => {
-    check();
-    const id = setInterval(check, 30000);
-    return () => clearInterval(id);
-  }, []);
-
-  const config = {
-    ok: { dot: "bg-green-500 animate-pulse", text: "text-green-400", label: "All systems operational" },
-    degraded: { dot: "bg-yellow-500 animate-pulse", text: "text-yellow-400", label: "Degraded" },
-    error: { dot: "bg-red-500", text: "text-red-400", label: "Service down" },
-    loading: { dot: "bg-zinc-600", text: "text-zinc-500", label: "Checking..." },
-  }[status];
-
-  return (
-    <a
-      href="/health"
-      className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-zinc-800 hover:border-zinc-600 transition-colors"
-    >
-      <span className={`w-2 h-2 rounded-full shrink-0 ${config.dot}`} />
-      <span className={`text-xs font-medium ${config.text}`}>{config.label}</span>
-    </a>
-  );
-}
-
 export default function AdminPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("users");
-  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     getMe()
       .then((me) => {
         if (me.role !== "admin") router.push("/dashboard");
-        else setReady(true);
+        else setUser(me);
       })
       .catch(() => router.push("/login"));
   }, [router]);
 
-  if (!ready) return (
+  if (!user) return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
       <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
     </div>
@@ -107,42 +71,7 @@ export default function AdminPage() {
         ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 2px; }
       `}</style>
 
-      {/* Header */}
-      <div className="border-b border-zinc-800 px-4 sm:px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-orange-500 rounded flex items-center justify-center text-white font-bold text-sm shrink-0">D</div>
-          <div>
-            <div style={{ fontFamily: "'Syne', sans-serif" }} className="text-base sm:text-lg font-800 tracking-tight">
-              DockCampus <span className="text-orange-500">Admin</span>
-            </div>
-            <div className="text-xs text-zinc-500 hidden sm:block">Control Panel</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <AdminHealthBadge />
-          {/* Mobile tab selector */}
-          <select
-            className="sm:hidden text-xs rounded px-2 py-1.5"
-            value={tab}
-            onChange={(e) => {
-              const value = e.target.value as Tab;
-              const t = tabs.find((x) => x.key === value);
-              if (t?.href) { router.push(t.href); return; }
-              setTab(value);
-            }}
-          >
-            {tabs.map((t) => (
-              <option key={t.key} value={t.key}>{t.label}</option>
-            ))}
-          </select>
-          <button
-            onClick={() => { document.cookie = "token=; Max-Age=0"; router.push("/login"); }}
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1.5 border border-zinc-800 rounded hover:border-zinc-600"
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
+      <Navbar user={user} />
 
       <div className="flex">
         {/* Sidebar — hidden on mobile */}
@@ -173,6 +102,20 @@ export default function AdminPage() {
 
         {/* Main content */}
         <div className="flex-1 min-w-0 p-4 sm:p-8">
+          <select
+            className="sm:hidden text-xs rounded px-2 py-1.5 mb-4 bg-zinc-900 border border-zinc-700"
+            value={tab}
+            onChange={(e) => {
+              const value = e.target.value as Tab;
+              const t = tabs.find((x) => x.key === value);
+              if (t?.href) { router.push(t.href); return; }
+              setTab(value);
+            }}
+          >
+            {tabs.map((t) => (
+              <option key={t.key} value={t.key}>{t.label}</option>
+            ))}
+          </select>
           {tab === "users" && <UsersTab />}
           {tab === "invites" && <InviteCodesTab />}
           {tab === "containers" && <ContainersTab />}

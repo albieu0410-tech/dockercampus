@@ -15,52 +15,11 @@ import {
   type Deployment,
   type Repo,
 } from "@/lib/api";
+import Navbar from "@/components/Navbar";
 import ContainerCard from "@/components/ContainerCard";
 import RepoInspector from "@/components/RepoInspector";
 
 type DashboardTab = "containers" | "deploy" | "deployments";
-
-function HealthBadge() {
-  const [status, setStatus] = useState<"ok" | "degraded" | "error" | "loading">("loading");
-
-  useEffect(() => {
-    let alive = true;
-    async function check() {
-      try {
-        const resp = await fetch("https://api.sudelca.com/health");
-        const data = await resp.json();
-        if (!alive) return;
-        setStatus(data.status === "ok" ? "ok" : "degraded");
-      } catch {
-        if (!alive) return;
-        setStatus("error");
-      }
-    }
-    check();
-    const id = setInterval(check, 30000);
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
-  }, []);
-
-  const config = {
-    ok: { dot: "bg-green-500 animate-pulse", text: "text-green-400", label: "Healthy" },
-    degraded: { dot: "bg-yellow-500 animate-pulse", text: "text-yellow-400", label: "Degraded" },
-    error: { dot: "bg-red-500", text: "text-red-400", label: "Down" },
-    loading: { dot: "bg-zinc-600", text: "text-zinc-500", label: "Checking" },
-  }[status];
-
-  return (
-    <a
-      href="/health"
-      className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-zinc-800 hover:border-zinc-600 transition-colors"
-    >
-      <span className={`w-2 h-2 rounded-full shrink-0 ${config.dot}`} />
-      <span className={`text-xs font-medium ${config.text}`}>{config.label}</span>
-    </a>
-  );
-}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -185,30 +144,7 @@ export default function DashboardPage() {
         .card { background: #18181b; border: 1px solid #27272a; }
       `}</style>
 
-      <div className="border-b border-zinc-800 px-4 sm:px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-orange-500 rounded flex items-center justify-center text-white font-bold text-sm shrink-0">D</div>
-          <div>
-            <div style={{ fontFamily: "'Syne', sans-serif" }} className="text-base sm:text-lg font-800 tracking-tight">
-              DockCampus <span className="text-orange-500">Student</span>
-            </div>
-            <div className="text-xs text-zinc-500 hidden sm:block">Workspace</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <HealthBadge />
-          <button
-            onClick={() => {
-              document.cookie = "token=; Max-Age=0";
-              localStorage.removeItem("token");
-              router.push("/login");
-            }}
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1.5 border border-zinc-800 rounded hover:border-zinc-600"
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
+      <Navbar user={user} />
 
       <div className="flex">
         <aside className="hidden sm:flex w-52 min-h-[calc(100vh-57px)] border-r border-zinc-800 p-4 flex-col gap-1 shrink-0">
