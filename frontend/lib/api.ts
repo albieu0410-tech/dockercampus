@@ -1,10 +1,5 @@
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sudelca.com";
-export const API_URL = RAW_API_URL.replace(/^http:\/\//, "https://").replace(/\/+$/, "");
-
-export function apiUrl(path: string): string {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${API_URL}${normalizedPath}`;
-}
+const API_URL = RAW_API_URL.replace(/^http:\/\//, "https://").replace(/\/+$/, "");
 
 function getToken() {
   if (typeof window === "undefined") return null;
@@ -14,7 +9,7 @@ function getToken() {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const normalizedPath = path.length > 1 ? path.replace(/\/+$/, "") : path;
-  const res = await fetch(apiUrl(normalizedPath), {
+  const res = await fetch(`${API_URL}${normalizedPath}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -180,139 +175,6 @@ export async function listDeployments() {
   return request<Deployment[]>("/deployments");
 }
 
-export async function cancelDeployment(deploymentId: string) {
-  return request<{ id: string; status: string; cancelled: boolean }>(
-    `/deployments/${encodeURIComponent(deploymentId)}/cancel`,
-    { method: "POST" }
-  );
-}
-
-// -- Hive ---------------------------------------------------------------------
-
-export async function listHiveNodes() {
-  return request<HiveNode[]>("/hive/nodes");
-}
-
-export async function getHiveJoinInfo() {
-  return request<HiveJoinInfo>("/hive/join-info");
-}
-
-// -- Routing ------------------------------------------------------------------
-
-export async function getRoutingState() {
-  return request<RoutingState>("/routing/state");
-}
-
-export async function setRoutingStrategy(strategy: "rr" | "least" | "sticky" | "weight") {
-  return request("/routing/strategy", {
-    method: "PUT",
-    body: JSON.stringify({ strategy }),
-  });
-}
-
-export async function setCanary(active: boolean, percent: number) {
-  return request("/routing/canary", {
-    method: "PUT",
-    body: JSON.stringify({ active, percent }),
-  });
-}
-
-export async function setCircuit(nodeId: string, state: "closed" | "half" | "open") {
-  return request(`/routing/nodes/${encodeURIComponent(nodeId)}/circuit`, {
-    method: "POST",
-    body: JSON.stringify({ state }),
-  });
-}
-
-// -- WireGuard ----------------------------------------------------------------
-
-export async function getWireGuardStatus() {
-  return request<WireGuardStatus>("/wireguard/status");
-}
-
-export async function listWireGuardPeers() {
-  return request<WireGuardPeer[]>("/wireguard/peers");
-}
-
-export async function upsertWireGuardPeer(data: {
-  node_id: string;
-  public_key?: string;
-  preshared_key?: string;
-  allowed_ips?: string;
-  endpoint?: string;
-  is_active?: boolean;
-}) {
-  return request<WireGuardPeer>("/wireguard/peers", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function updateWireGuardPeer(
-  nodeId: string,
-  data: {
-    public_key?: string;
-    preshared_key?: string;
-    allowed_ips?: string;
-    endpoint?: string;
-    is_active?: boolean;
-  }
-) {
-  return request<WireGuardPeer>(`/wireguard/peers/${encodeURIComponent(nodeId)}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  });
-}
-
-// -- Jobs ---------------------------------------------------------------------
-
-export async function listJobs(params?: { status?: string; limit?: number }) {
-  const q = new URLSearchParams();
-  if (params?.status) q.set("status", params.status);
-  if (params?.limit != null) q.set("limit", String(params.limit));
-  const suffix = q.toString() ? `?${q.toString()}` : "";
-  return request<Job[]>(`/jobs/${suffix}`);
-}
-
-export async function createJob(data: {
-  job_type: string;
-  payload?: Record<string, unknown>;
-  max_retries?: number;
-}) {
-  return request<Job>("/jobs", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function retryJob(jobId: string) {
-  return request<Job>(`/jobs/${encodeURIComponent(jobId)}/retry`, {
-    method: "POST",
-  });
-}
-
-export async function cancelJob(jobId: string) {
-  return request<Job>(`/jobs/${encodeURIComponent(jobId)}/cancel`, {
-    method: "POST",
-  });
-}
-
-// -- Sleep --------------------------------------------------------------------
-
-export async function getSleepStatus() {
-  return request<SleepStatus>("/sleep/status");
-}
-
-export async function listSleepCandidates(limit = 100) {
-  return request<SleepCandidate[]>(`/sleep/candidates?limit=${encodeURIComponent(String(limit))}`);
-}
-
-export async function runSleepManagerOnce() {
-  return request<SleepReport>("/sleep/run", {
-    method: "POST",
-  });
-}
-
 // -- Types --------------------------------------------------------------------
 
 export type User = {
@@ -367,109 +229,6 @@ export type Deployment = {
   build_logs: string | null;
   public_url: string | null;
   created_at: string;
-};
-
-export type HiveNode = {
-  id: string;
-  role: "queen" | "worker";
-  host: string;
-  ip: string;
-  ram_used: number;
-  ram_total: number;
-  cpu: number;
-  disk_used: number;
-  disk_total: number;
-  deployments: number;
-  last: string;
-  online: boolean;
-};
-
-export type HiveJoinInfo = {
-  join_token: string;
-  join_command: string;
-};
-
-export type RoutingState = {
-  strategy: "rr" | "least" | "sticky" | "weight";
-  canary_active: boolean;
-  canary_percent: number;
-  nodes: RoutingNode[];
-};
-
-export type RoutingNode = {
-  id: string;
-  reqs: number;
-  rt: number;
-  err: number;
-  breaker: "closed" | "half" | "open";
-  failures: number;
-  weight: number;
-  active_connections: number;
-  is_canary: boolean;
-  host: string;
-  ip: string;
-  online: boolean;
-};
-
-export type WireGuardStatus = {
-  enabled: boolean;
-  configured: boolean;
-  interface: string;
-  network_cidr: string;
-  listen_port: number;
-  has_private_key: boolean;
-  has_public_key: boolean;
-};
-
-export type WireGuardPeer = {
-  id: string;
-  node_id: string;
-  public_key: string;
-  preshared_key: string | null;
-  allowed_ips: string;
-  endpoint: string | null;
-  is_active: boolean;
-  last_handshake: string | null;
-  updated_at: string;
-};
-
-export type Job = {
-  id: string;
-  job_type: string;
-  payload: Record<string, unknown>;
-  status: "pending" | "running" | "done" | "failed" | "cancelled";
-  created_at: string;
-  started_at: string | null;
-  completed_at: string | null;
-  error: string | null;
-  retries: number;
-  max_retries: number;
-};
-
-export type SleepStatus = {
-  config: {
-    enabled: boolean;
-    idle_sleep_minutes: number;
-    scan_interval_seconds: number;
-  };
-  running: number;
-  sleeping: number;
-  stopped: number;
-  idle_candidates: number;
-};
-
-export type SleepCandidate = {
-  user_id: string;
-  docker_container_id: string | null;
-  last_activity: string;
-};
-
-export type SleepReport = {
-  scanned: number;
-  slept: number;
-  failed: number;
-  skipped: number;
-  idle_minutes: number;
 };
 
 export type AdminUser = {
