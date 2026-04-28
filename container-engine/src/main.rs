@@ -1,11 +1,11 @@
 use axum::{
-    http::{HeaderValue, Method},
+    http::{header, Method},
     Router,
 };
 use dotenv::dotenv;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -63,25 +63,23 @@ async fn main() -> anyhow::Result<()> {
     });
     sleep::spawn_manager(state.clone());
 
-    let cors_base = CorsLayer::new()
+    let cors = CorsLayer::new()
+        .allow_origin(
+            std::env::var("ALLOWED_ORIGINS")
+                .unwrap_or_default()
+                .split(',')
+                .filter_map(|s| s.trim().parse().ok())
+                .collect::<Vec<_>>(),
+        )
         .allow_methods([
             Method::GET,
             Method::POST,
-            Method::DELETE,
             Method::PUT,
-            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
         ])
-        .allow_headers(Any);
-    let cors = if config.allowed_origins.iter().any(|origin| origin == "*") {
-        cors_base.allow_origin(Any)
-    } else {
-        let allowed_origins: Vec<HeaderValue> = config
-            .allowed_origins
-            .iter()
-            .filter_map(|origin| origin.parse::<HeaderValue>().ok())
-            .collect();
-        cors_base.allow_origin(allowed_origins)
-    };
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
+        .allow_credentials(true);
 
     let app = Router::new()
         .nest("/auth", handlers::auth::router())
