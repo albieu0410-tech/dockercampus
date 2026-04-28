@@ -6,7 +6,7 @@ import UsersTab from "./components/UsersTab";
 import InviteCodesTab from "./components/InviteCodesTab";
 import ContainersTab from "./components/ContainersTab";
 
-type Tab = "users" | "invites" | "containers" | "health";
+type Tab = "users" | "invites" | "containers" | "health" | "hive" | "routing" | "jobs" | "sleep" | "wireguard";
 
 function AdminHealthBadge() {
   const [status, setStatus] = useState<"ok" | "degraded" | "error" | "loading">("loading");
@@ -65,11 +65,16 @@ export default function AdminPage() {
     </div>
   );
 
-  const tabs: { key: Tab; label: string; icon: string }[] = [
-    { key: "users", label: "Users", icon: "⬡" },
-    { key: "invites", label: "Invite Codes", icon: "⬢" },
-    { key: "containers", label: "Containers", icon: "⬣" },
-    { key: "health", label: "Status", icon: "⬤" },
+  const tabs: { key: Tab; label: string; icon: string; href?: string }[] = [
+    { key: "users",      label: "Users",        icon: "⬡" },
+    { key: "invites",    label: "Invite Codes", icon: "⬢" },
+    { key: "containers", label: "Containers",   icon: "⬣" },
+    { key: "health",     label: "Status",       icon: "⬤", href: "/health" },
+    { key: "hive",       label: "Hive",         icon: "◈", href: "/hive" },
+    { key: "routing",    label: "Routing",      icon: "◇", href: "/routing" },
+    { key: "jobs",       label: "Jobs",         icon: "◆", href: "/jobs" },
+    { key: "sleep",      label: "Sleep",        icon: "◉", href: "/sleep" },
+    { key: "wireguard",  label: "WireGuard",    icon: "◎", href: "/wireguard" },
   ];
 
   return (
@@ -121,8 +126,9 @@ export default function AdminPage() {
             value={tab}
             onChange={(e) => {
               const value = e.target.value as Tab;
+              const t = tabs.find((x) => x.key === value);
+              if (t?.href) { router.push(t.href); return; }
               setTab(value);
-              if (value === "health") router.push("/health");
             }}
           >
             {tabs.map((t) => (
@@ -145,8 +151,8 @@ export default function AdminPage() {
             <button
               key={t.key}
               onClick={() => {
+                if (t.href) { router.push(t.href); return; }
                 setTab(t.key);
-                if (t.key === "health") router.push("/health");
               }}
               className={`w-full text-left px-4 py-3 rounded text-sm transition-all flex items-center gap-3 ${
                 tab === t.key ? "tab-active" : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900"
