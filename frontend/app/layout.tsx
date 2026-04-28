@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import './globals.css';
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "DockCampus",
-  description: "Container management for students and professors",
+  title: 'DockCampus',
+  description: 'DockCampus platform',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
