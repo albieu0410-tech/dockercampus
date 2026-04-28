@@ -64,7 +64,13 @@ async fn main() -> anyhow::Result<()> {
     sleep::spawn_manager(state.clone());
 
     let cors_base = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PUT])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::DELETE,
+            Method::PUT,
+            Method::PATCH,
+        ])
         .allow_headers(Any);
     let cors = if config.allowed_origins.iter().any(|origin| origin == "*") {
         cors_base.allow_origin(Any)

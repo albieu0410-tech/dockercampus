@@ -3,15 +3,17 @@ use crate::errors::{AppError, Result};
 use crate::state::AppState;
 use axum::{
     body::Bytes,
-    extract::{Path, RawQuery, State},
+    extract::{ws::WebSocketUpgrade, Path, RawQuery, State},
     http::{HeaderMap, Method, StatusCode},
     response::{IntoResponse, Response},
-    routing::{any, delete, get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
+use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use std::sync::Arc;
+use tokio_tungstenite::tungstenite::Message as WsMessage;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -37,7 +39,19 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(list_containers))
         .route("/create", post(create_container))
-        .route("/:user_id/app/*path", any(proxy_to_container_http))
+        .route("/app/:user_id/*path", get(proxy_or_ws_to_container_get))
+        .route("/app/:user_id/*path", post(proxy_to_container_http))
+        .route("/app/:user_id/*path", delete(proxy_to_container_http))
+        .route("/app/:user_id/*path", axum::routing::put(proxy_to_container_http))
+        .route(
+            "/app/:user_id/*path",
+            axum::routing::patch(proxy_to_container_http),
+        )
+        .route(
+            "/app/:user_id/*path",
+            axum::routing::options(proxy_to_container_http),
+        )
+        .route("/app/:user_id/*path", axum::routing::head(proxy_to_container_http))
         .route("/:user_id/exec", post(exec_in_container))
         .route("/:user_id/start", post(start_container))
         .route("/:user_id/stop", post(stop_container))
@@ -368,11 +382,87 @@ async fn proxy_to_container_http(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Response> {
+    proxy_http_inner(
+        &state,
+        &user_id,
+        &path,
+        query,
+        method,
+        headers,
+        Some(body),
+    )
+    .await
+}
+
+async fn proxy_or_ws_to_container_get(
+    ws: Option<WebSocketUpgrade>,
+    State(state): State<Arc<AppState>>,
+    Path((user_id, path)): Path<(String, String)>,
+    RawQuery(query): RawQuery,
+    headers: HeaderMap,
+) -> Result<Response> {
+    if let Some(ws) = ws {
+        let user_id_uuid = parse_user_id(&user_id)?;
+        let target = fetch_proxy_target(&state, user_id_uuid).await?;
+
+        if target.status == "sleeping" {
+            wake_sleeping_container(&state, user_id_uuid, target.docker_container_id.as_deref())
+                .await?;
+            return Ok((
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({
+                    "detail": "Container is waking up. Please try again in a few seconds."
+                })),
+            )
+                .into_response());
+        }
+        if target.status != "running" {
+            return Ok((
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({ "detail": "Container is not running" })),
+            )
+                .into_response());
+        }
+
+        touch_last_activity(&state, user_id_uuid).await?;
+
+        let mut target_url = format!("ws://host.docker.internal:{}/{}", target.port, path);
+        if let Some(q) = query.as_deref().filter(|q| !q.is_empty()) {
+            target_url.push('?');
+            target_url.push_str(q);
+        }
+
+        return Ok(ws
+            .on_upgrade(move |socket| bridge_websocket(socket, target_url, headers))
+            .into_response());
+    }
+
+    proxy_http_inner(
+        &state,
+        &user_id,
+        &path,
+        query,
+        Method::GET,
+        headers,
+        None,
+    )
+    .await
+}
+
+async fn proxy_http_inner(
+    state: &AppState,
+    user_id: &str,
+    path: &str,
+    query: Option<String>,
+    method: Method,
+    headers: HeaderMap,
+    body: Option<Bytes>,
+) -> Result<Response> {
     let user_id = parse_user_id(&user_id)?;
-    let target = fetch_proxy_target(&state, user_id).await?;
+    let target = fetch_proxy_target(state, user_id).await?;
 
     if target.status == "sleeping" {
-        wake_sleeping_container(&state, user_id, target.docker_container_id.as_deref()).await?;
+        wake_sleeping_container(state, user_id, target.docker_container_id.as_deref()).await?;
         return Ok((
             StatusCode::SERVICE_UNAVAILABLE,
             Json(serde_json::json!({
@@ -390,7 +480,7 @@ async fn proxy_to_container_http(
             .into_response());
     }
 
-    touch_last_activity(&state, user_id).await?;
+    touch_last_activity(state, user_id).await?;
 
     let mut target_url = format!("http://host.docker.internal:{}/{}", target.port, path);
     if let Some(query) = query.as_deref().filter(|q| !q.is_empty()) {
@@ -400,14 +490,16 @@ async fn proxy_to_container_http(
 
     let reqwest_method =
         reqwest::Method::from_bytes(method.as_str().as_bytes()).map_err(anyhow::Error::from)?;
-    let mut req_builder = state.http_client.request(reqwest_method, &target_url);
+    let mut req_builder = state.http_client.request(reqwest_method, target_url);
     for (name, value) in &headers {
         if should_skip_proxy_header(name.as_str()) {
             continue;
         }
         req_builder = req_builder.header(name, value);
     }
-    req_builder = req_builder.body(body);
+    if let Some(body) = body {
+        req_builder = req_builder.body(body);
+    }
 
     let upstream = req_builder.send().await.map_err(anyhow::Error::from)?;
     let status = upstream.status();
@@ -422,6 +514,62 @@ async fn proxy_to_container_http(
         .body(axum::body::Body::from(bytes))
         .map_err(anyhow::Error::from)?
         .into_response())
+}
+
+async fn bridge_websocket(socket: axum::extract::ws::WebSocket, target_url: String, headers: HeaderMap) {
+    let mut request = axum::http::Request::builder().uri(target_url);
+    for (name, value) in headers.iter() {
+        if should_skip_proxy_header(name.as_str()) {
+            continue;
+        }
+        request = request.header(name, value);
+    }
+    let Ok(request) = request.body(()) else {
+        return;
+    };
+
+    let Ok((upstream, _)) = tokio_tungstenite::connect_async(request).await else {
+        return;
+    };
+
+    let (mut client_tx, mut client_rx) = socket.split();
+    let (mut upstream_tx, mut upstream_rx) = upstream.split();
+
+    let c2u = async {
+        while let Some(Ok(msg)) = client_rx.next().await {
+            let mapped = match msg {
+                axum::extract::ws::Message::Text(v) => WsMessage::Text(v),
+                axum::extract::ws::Message::Binary(v) => WsMessage::Binary(v),
+                axum::extract::ws::Message::Ping(v) => WsMessage::Ping(v),
+                axum::extract::ws::Message::Pong(v) => WsMessage::Pong(v),
+                axum::extract::ws::Message::Close(_) => WsMessage::Close(None),
+            };
+            if upstream_tx.send(mapped).await.is_err() {
+                break;
+            }
+        }
+    };
+
+    let u2c = async {
+        while let Some(Ok(msg)) = upstream_rx.next().await {
+            let mapped = match msg {
+                WsMessage::Text(v) => axum::extract::ws::Message::Text(v),
+                WsMessage::Binary(v) => axum::extract::ws::Message::Binary(v),
+                WsMessage::Ping(v) => axum::extract::ws::Message::Ping(v),
+                WsMessage::Pong(v) => axum::extract::ws::Message::Pong(v),
+                WsMessage::Close(_) => axum::extract::ws::Message::Close(None),
+                WsMessage::Frame(_) => continue,
+            };
+            if client_tx.send(mapped).await.is_err() {
+                break;
+            }
+        }
+    };
+
+    tokio::select! {
+        _ = c2u => {}
+        _ = u2c => {}
+    }
 }
 
 fn parse_user_id(value: &str) -> Result<Uuid> {

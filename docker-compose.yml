@@ -12,7 +12,6 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
       - container-engine
-      - backend
       - frontend
 
   db:
@@ -41,20 +40,6 @@ services:
       - "8001:8001"
     depends_on:
       - db
-
-  backend:
-    build: ./backend
-    container_name: dockcampus-backend
-    restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    env_file:
-      - .env
-    # Kept temporarily for /app/* HTTP+websocket proxy until Rust parity is complete.
-    # Remove this service after porting containers app proxy/tunnel endpoints to Rust.
-    depends_on:
-      - db
-      - container-engine
 
   frontend:
     build:
