@@ -46,12 +46,14 @@ services:
       context: ./frontend
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        ENVIRONMENT: ${ENVIRONMENT}
     container_name: dockcampus-frontend
     restart: unless-stopped
     env_file:
       - .env
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_ENVIRONMENT: ${ENVIRONMENT}
     ports:
       - "3000:3000"
     depends_on:

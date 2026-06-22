@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getMe, login, verifyOtp } from "@/lib/api";
+import { API_URL, getMe, login, verifyOtp } from "@/lib/api";
 import { saveToken } from "@/lib/auth";
 
 function LoginForm() {
@@ -78,7 +78,7 @@ function LoginForm() {
             DockCampus lets you ship from GitHub to your own Hive infrastructure with full control.
           </p>
         </div>
-        <div className="text-xs text-zinc-500">queen online · api.sudelca.com</div>
+        <div className="text-xs text-zinc-500">queen online · {API_URL}</div>
       </section>
 
       <section className="flex items-center justify-center p-6 sm:p-10">

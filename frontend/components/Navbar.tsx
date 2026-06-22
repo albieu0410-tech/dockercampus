@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clearToken } from "@/lib/auth";
-import type { User } from "@/lib/api";
+import { apiUrl, type User } from "@/lib/api";
 
 type HealthStatus = "ok" | "degraded" | "error" | "loading";
 
@@ -12,7 +12,7 @@ function HealthBadge() {
 
   async function check() {
     try {
-      const resp = await fetch("https://api.sudelca.com/health");
+      const resp = await fetch(apiUrl("/health"));
       const data = await resp.json();
       setStatus(data.status === "ok" ? "ok" : "degraded");
     } catch {

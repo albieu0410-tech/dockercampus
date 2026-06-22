@@ -232,7 +232,7 @@ async fn login(
     let email: String = user.try_get("email")?;
     let role: String = user.try_get("role")?;
 
-    if is_verified {
+    if is_verified || !two_factor_auth_required() {
         let token = jwt::create_token(
             &user_id.to_string(),
             &email,
@@ -275,6 +275,57 @@ async fn login(
         otp_session_id: Some(session_id),
         message: Some("Check your email for a 6-digit code.".to_string()),
     }))
+}
+
+fn two_factor_auth_required() -> bool {
+    let environment = std::env::var("ENVIRONMENT").unwrap_or_default();
+    let enabled = std::env::var("AUTH_2FA_ENABLED").ok();
+
+    two_factor_auth_required_for(&environment, enabled.as_deref())
+}
+
+fn two_factor_auth_required_for(environment: &str, enabled: Option<&str>) -> bool {
+    let environment = environment.trim().to_ascii_lowercase();
+    let is_local = matches!(
+        environment.as_str(),
+        "local" | "development" | "dev" | "test"
+    );
+
+    if !is_local {
+        return true;
+    }
+
+    enabled
+        .map(|value| {
+            !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "false" | "0" | "no" | "off"
+            )
+        })
+        .unwrap_or(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::two_factor_auth_required_for;
+
+    #[test]
+    fn two_factor_auth_can_be_disabled_locally() {
+        assert!(!two_factor_auth_required_for("development", Some("false")));
+        assert!(!two_factor_auth_required_for("local", Some("off")));
+    }
+
+    #[test]
+    fn two_factor_auth_defaults_to_enabled() {
+        assert!(two_factor_auth_required_for("development", None));
+        assert!(two_factor_auth_required_for("development", Some("true")));
+    }
+
+    #[test]
+    fn two_factor_auth_cannot_be_disabled_in_production() {
+        assert!(two_factor_auth_required_for("production", Some("false")));
+        assert!(two_factor_auth_required_for("", Some("false")));
+    }
 }
 
 #[derive(Debug, Deserialize)]

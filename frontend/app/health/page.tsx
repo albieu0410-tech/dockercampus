@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getMe, type User } from "@/lib/api";
+import { API_URL, apiUrl, getMe, type User } from "@/lib/api";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 
@@ -48,7 +48,7 @@ export default function HealthPage() {
   async function check() {
     setChecking(true);
     try {
-      const resp = await fetch("https://api.sudelca.com/health");
+      const resp = await fetch(apiUrl("/health"));
       const json = await resp.json();
       setData(json);
       setError(false);
@@ -121,7 +121,7 @@ export default function HealthPage() {
                 {error ? "down" : "operational"}
               </span>
             </div>
-            <div className="text-xs text-zinc-500">api.sudelca.com</div>
+            <div className="text-xs text-zinc-500">{API_URL}</div>
             {data && (
               <div className="text-xs text-zinc-400">
                 Uptime: <span className="text-zinc-200">{formatUptime(data.uptime_seconds)}</span>

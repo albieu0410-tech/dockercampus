@@ -1,5 +1,9 @@
-const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sudelca.com";
-export const API_URL = RAW_API_URL.replace(/^http:\/\//, "https://").replace(/\/+$/, "");
+const IS_LOCAL_DEVELOPMENT = process.env.NEXT_PUBLIC_ENVIRONMENT === "development";
+const RAW_API_URL = IS_LOCAL_DEVELOPMENT
+  ? "/api"
+  : process.env.NEXT_PUBLIC_API_URL || "https://api.sudelca.com";
+
+export const API_URL = RAW_API_URL.replace(/\/+$/, "");
 
 export function apiUrl(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
@@ -116,10 +120,10 @@ export async function getContainers() {
   return request<AdminContainer[]>("/containers");
 }
 
-export async function createContainer(data: { name: string; image: string }) {
-  return request<Container>("/containers", {
+export async function createContainer(userId: string | number) {
+  return request<{ container_id: string; port: number; editor_url: string }>("/containers/create", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify({ user_id: userId }),
   });
 }
 

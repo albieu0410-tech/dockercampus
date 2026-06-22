@@ -10,6 +10,7 @@ import {
   listRepos,
   createDeployment,
   listDeployments,
+  apiUrl,
   type User,
   type Container,
   type Deployment,
@@ -35,6 +36,7 @@ export default function DashboardPage() {
   const [repoUrl, setRepoUrl] = useState("");
   const [selectedRepo, setSelectedRepo] = useState("");
   const [customPort, setCustomPort] = useState("");
+  const [actionError, setActionError] = useState("");
 
   async function load() {
     const [me, conts] = await Promise.all([getMe(), listContainers()]);
@@ -75,9 +77,13 @@ export default function DashboardPage() {
 
   async function handleCreate() {
     setCreating(true);
+    setActionError("");
     try {
-      await createContainer({ name: "environment", image: "dockcampus-student" });
+      if (!user) return;
+      await createContainer(user.id);
       await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not create environment");
     } finally {
       setCreating(false);
     }
@@ -86,7 +92,12 @@ export default function DashboardPage() {
   async function handleDeploy(e: React.FormEvent) {
     e.preventDefault();
     setDeploying(true);
+    setActionError("");
     try {
+      if (!hasContainer) {
+        setActionError("Create an environment before deploying a repository.");
+        return;
+      }
       const url = selectedRepo || repoUrl;
       if (!url) return;
       await createDeployment({
@@ -98,6 +109,8 @@ export default function DashboardPage() {
       setCustomPort("");
       setTab("deployments");
       await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Deployment failed");
     } finally {
       setDeploying(false);
     }
@@ -179,6 +192,12 @@ export default function DashboardPage() {
             )}
           </div>
 
+          {actionError && (
+            <div className="rounded-md border border-red-800/60 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+              {actionError}
+            </div>
+          )}
+
           <div className="card rounded-xl p-1 flex gap-1 w-full sm:w-fit">
             {(["containers", "deploy", "deployments"] as const).map((t) => (
               <button
@@ -219,7 +238,7 @@ export default function DashboardPage() {
                     <p className="text-zinc-400 text-sm mt-1">Connect to deploy from your repositories</p>
                   </div>
                   <a
-                    href={`https://api.sudelca.com/auth/github/login?token=${typeof window !== "undefined" ? localStorage.getItem("token") || "" : ""}`}
+                    href={apiUrl(`/auth/github/login?token=${typeof window !== "undefined" ? localStorage.getItem("token") || "" : ""}`)}
                     className="inline-block bg-orange-500 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-600"
                   >
                     Connect GitHub
@@ -291,11 +310,16 @@ export default function DashboardPage() {
 
                   <button
                     type="submit"
-                    disabled={deploying}
+                    disabled={deploying || !hasContainer}
                     className="bg-orange-500 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-600 disabled:opacity-50"
                   >
                     {deploying ? "Deploying..." : "Deploy"}
                   </button>
+                  {!hasContainer && (
+                    <p className="text-sm text-amber-300">
+                      Create an environment from the Containers tab before deploying.
+                    </p>
+                  )}
                 </form>
               </div>
             </div>
