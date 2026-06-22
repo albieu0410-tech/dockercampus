@@ -68,3 +68,47 @@ where
         Err(e) => Err(e).with_context(|| format!("{key} cannot be read")),
     }
 }
+
+pub fn public_base_url() -> String {
+    let environment = env::var("ENVIRONMENT").unwrap_or_default();
+    let configured = env::var("BASE_URL").ok();
+    public_base_url_for(&environment, configured.as_deref())
+}
+
+fn public_base_url_for(environment: &str, configured: Option<&str>) -> String {
+    let environment = environment.trim().to_ascii_lowercase();
+    if matches!(
+        environment.as_str(),
+        "local" | "development" | "dev" | "test"
+    ) {
+        return "http://localhost".to_string();
+    }
+
+    configured
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("https://dockcampus.sudelca.com")
+        .trim_end_matches('/')
+        .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::public_base_url_for;
+
+    #[test]
+    fn development_always_uses_localhost() {
+        assert_eq!(
+            public_base_url_for("development", Some("https://dockcampus.sudelca.com")),
+            "http://localhost"
+        );
+    }
+
+    #[test]
+    fn production_uses_configured_base_url() {
+        assert_eq!(
+            public_base_url_for("production", Some("https://dockcampus.example/")),
+            "https://dockcampus.example"
+        );
+    }
+}

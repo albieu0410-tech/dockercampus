@@ -488,8 +488,7 @@ async fn run_deployment_task(
         return Ok(());
     }
 
-    let base_url =
-        std::env::var("BASE_URL").unwrap_or_else(|_| "https://dockcampus.sudelca.com".to_string());
+    let base_url = crate::config::public_base_url();
     let public_url = format!("{}/app/{}/proxy/{}/", base_url, user_id, final_port);
 
     update_deployment_status(

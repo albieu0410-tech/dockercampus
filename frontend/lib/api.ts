@@ -4,6 +4,9 @@ const RAW_API_URL = IS_LOCAL_DEVELOPMENT
   : process.env.NEXT_PUBLIC_API_URL || "https://api.sudelca.com";
 
 export const API_URL = RAW_API_URL.replace(/\/+$/, "");
+export const APP_URL = IS_LOCAL_DEVELOPMENT
+  ? "http://localhost"
+  : "https://dockcampus.sudelca.com";
 
 export function apiUrl(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;

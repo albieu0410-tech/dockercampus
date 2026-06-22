@@ -1,3 +1,4 @@
+use crate::config::public_base_url;
 use crate::db;
 use crate::errors::{AppError, Result};
 use crate::state::AppState;
@@ -42,7 +43,10 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/app/:user_id/*path", get(proxy_or_ws_to_container_get))
         .route("/app/:user_id/*path", post(proxy_to_container_http))
         .route("/app/:user_id/*path", delete(proxy_to_container_http))
-        .route("/app/:user_id/*path", axum::routing::put(proxy_to_container_http))
+        .route(
+            "/app/:user_id/*path",
+            axum::routing::put(proxy_to_container_http),
+        )
         .route(
             "/app/:user_id/*path",
             axum::routing::patch(proxy_to_container_http),
@@ -51,7 +55,10 @@ pub fn router() -> Router<Arc<AppState>> {
             "/app/:user_id/*path",
             axum::routing::options(proxy_to_container_http),
         )
-        .route("/app/:user_id/*path", axum::routing::head(proxy_to_container_http))
+        .route(
+            "/app/:user_id/*path",
+            axum::routing::head(proxy_to_container_http),
+        )
         .route("/:user_id/exec", post(exec_in_container))
         .route("/:user_id/start", post(start_container))
         .route("/:user_id/stop", post(stop_container))
@@ -105,6 +112,7 @@ fn sanitize_command(cmd: &str) -> Result<String> {
 }
 
 async fn list_containers(State(state): State<Arc<AppState>>) -> Result<Json<serde_json::Value>> {
+    let base_url = public_base_url();
     let containers = sqlx::query(
         r#"
         SELECT c.id, c.user_id, c.docker_container_id,
@@ -127,6 +135,7 @@ async fn list_containers(State(state): State<Arc<AppState>>) -> Result<Json<serd
                 "status": row.try_get::<String, _>("status")?,
                 "cpu_limit": row.try_get::<f64, _>("cpu_limit")?,
                 "memory_limit_mb": row.try_get::<i32, _>("memory_limit_mb")?,
+                "editor_url": format!("{}/app/{}/", base_url, row.try_get::<Uuid, _>("user_id")?),
                 "created_at": row.try_get::<chrono::DateTime<chrono::Utc>, _>("created_at")?.to_rfc3339(),
             }))
         })
@@ -184,7 +193,7 @@ async fn create_container(
     .execute(&state.db)
     .await?;
 
-    let editor_url = format!("https://dockcampus.sudelca.com/student/{}", user_id);
+    let editor_url = format!("{}/app/{}/", public_base_url(), user_id);
 
     Ok(Json(CreateContainerResponse {
         container_id: docker_id,
@@ -397,16 +406,7 @@ async fn proxy_to_container_http(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Response> {
-    proxy_http_inner(
-        &state,
-        &user_id,
-        &path,
-        query,
-        method,
-        headers,
-        Some(body),
-    )
-    .await
+    proxy_http_inner(&state, &user_id, &path, query, method, headers, Some(body)).await
 }
 
 async fn proxy_or_ws_to_container_get(
@@ -452,16 +452,7 @@ async fn proxy_or_ws_to_container_get(
             .into_response());
     }
 
-    proxy_http_inner(
-        &state,
-        &user_id,
-        &path,
-        query,
-        Method::GET,
-        headers,
-        None,
-    )
-    .await
+    proxy_http_inner(&state, &user_id, &path, query, Method::GET, headers, None).await
 }
 
 async fn proxy_http_inner(
@@ -531,7 +522,11 @@ async fn proxy_http_inner(
         .into_response())
 }
 
-async fn bridge_websocket(socket: axum::extract::ws::WebSocket, target_url: String, headers: HeaderMap) {
+async fn bridge_websocket(
+    socket: axum::extract::ws::WebSocket,
+    target_url: String,
+    headers: HeaderMap,
+) {
     let mut request = axum::http::Request::builder().uri(target_url);
     for (name, value) in headers.iter() {
         if should_skip_proxy_header(name.as_str()) {

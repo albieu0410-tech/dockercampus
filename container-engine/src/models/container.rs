@@ -47,7 +47,11 @@ pub struct ContainerResponse {
 
 impl ContainerResponse {
     pub fn from_container(container: Container, base_url: &str) -> Self {
-        let editor_url = format!("{}/student/{}", base_url, container.user_id);
+        let editor_url = format!(
+            "{}/app/{}/",
+            base_url.trim_end_matches('/'),
+            container.user_id
+        );
         Self {
             id: container.id,
             user_id: container.user_id,

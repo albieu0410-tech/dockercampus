@@ -1,5 +1,5 @@
 "use client";
-import { containerAction, deleteContainer, type Container } from "@/lib/api";
+import { APP_URL, containerAction, deleteContainer, type Container } from "@/lib/api";
 import { useState } from "react";
 
 export default function ContainerCard({
@@ -33,7 +33,7 @@ export default function ContainerCard({
   }
 
   const isRunning = container.status === "running";
-  const editorUrl = container.editor_url || `https://dockcampus.sudelca.com/app/${container.user_id}/`;
+  const editorUrl = container.editor_url || `${APP_URL}/app/${container.user_id}/`;
 
   return (
     <div className="bg-card border rounded-xl p-5 space-y-3 shadow-sm">
