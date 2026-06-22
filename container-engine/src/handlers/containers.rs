@@ -40,6 +40,8 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(list_containers))
         .route("/create", post(create_container))
+        .route("/app/:user_id", get(proxy_container_root_get))
+        .route("/app/:user_id/", get(proxy_container_root_get))
         .route("/app/:user_id/*path", get(proxy_or_ws_to_container_get))
         .route("/app/:user_id/*path", post(proxy_to_container_http))
         .route("/app/:user_id/*path", delete(proxy_to_container_http))
@@ -396,6 +398,15 @@ struct ProxyTarget {
     status: String,
     port: i32,
     docker_container_id: Option<String>,
+}
+
+async fn proxy_container_root_get(
+    State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+    RawQuery(query): RawQuery,
+    headers: HeaderMap,
+) -> Result<Response> {
+    proxy_http_inner(&state, &user_id, "", query, Method::GET, headers, None).await
 }
 
 async fn proxy_to_container_http(
