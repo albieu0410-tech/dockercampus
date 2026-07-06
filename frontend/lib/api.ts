@@ -192,6 +192,22 @@ export async function listDeployments() {
   return request<Deployment[]>("/deployments");
 }
 
+export async function getDeployment(deploymentId: string) {
+  return request<Deployment>(`/deployments/${encodeURIComponent(deploymentId)}`);
+}
+
+export const DEPLOYMENT_IN_PROGRESS_STATUSES = [
+  "pending",
+  "cloning",
+  "detecting",
+  "building",
+  "starting",
+] as const;
+
+export function isDeploymentInProgress(status: string): boolean {
+  return (DEPLOYMENT_IN_PROGRESS_STATUSES as readonly string[]).includes(status);
+}
+
 export async function cancelDeployment(deploymentId: string) {
   return request<{ id: string; status: string; cancelled: boolean }>(
     `/deployments/${encodeURIComponent(deploymentId)}/cancel`,

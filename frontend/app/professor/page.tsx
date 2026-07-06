@@ -8,6 +8,7 @@ import {
 } from "@/lib/api";
 import Navbar from "@/components/Navbar";
 import RepoInspector from "@/components/RepoInspector";
+import DeploymentLogsModal from "@/components/DeploymentLogsModal";
 
 type Tab = "overview" | "containers" | "deployments";
 
@@ -23,6 +24,7 @@ export default function ProfessorPage() {
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [viewingDeploymentId, setViewingDeploymentId] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -374,22 +376,27 @@ export default function ProfessorPage() {
                       {d.public_url}
                     </a>
                   )}
-                  {d.build_logs && (
-                    <details className="text-xs">
-                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                        View build logs
-                      </summary>
-                      <pre className="mt-2 bg-muted rounded p-3 overflow-x-auto text-xs whitespace-pre-wrap max-h-48">
-                        {d.build_logs}
-                      </pre>
-                    </details>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setViewingDeploymentId(d.id)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    View live logs
+                  </button>
                 </div>
               ))}
             </div>
           </div>
         )}
       </main>
+
+      {viewingDeploymentId && (
+        <DeploymentLogsModal
+          deploymentId={viewingDeploymentId}
+          initial={deployments.find((d) => d.id === viewingDeploymentId)}
+          onClose={() => setViewingDeploymentId(null)}
+        />
+      )}
     </div>
   );
 }

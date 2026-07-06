@@ -19,6 +19,7 @@ import {
 import Navbar from "@/components/Navbar";
 import ContainerCard from "@/components/ContainerCard";
 import RepoInspector from "@/components/RepoInspector";
+import DeploymentLogsModal from "@/components/DeploymentLogsModal";
 
 type DashboardTab = "containers" | "deploy" | "deployments";
 
@@ -37,6 +38,7 @@ export default function DashboardPage() {
   const [selectedRepo, setSelectedRepo] = useState("");
   const [customPort, setCustomPort] = useState("");
   const [actionError, setActionError] = useState("");
+  const [viewingDeploymentId, setViewingDeploymentId] = useState<string | null>(null);
 
   async function load() {
     const [me, conts] = await Promise.all([getMe(), listContainers()]);
@@ -331,14 +333,18 @@ export default function DashboardPage() {
                 <div className="card rounded-xl p-8 text-center text-zinc-400 text-sm">No deployments yet</div>
               ) : (
                 deployments.map((d) => (
-                  <div key={d.id} className="card rounded-xl p-4 sm:p-5">
+                  <div
+                    key={d.id}
+                    className="card rounded-xl p-4 sm:p-5 cursor-pointer hover:border-zinc-700"
+                    onClick={() => setViewingDeploymentId(d.id)}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-semibold truncate">{d.repo_url}</p>
                         <p className="text-xs text-zinc-400 mt-1">Created: {new Date(d.created_at).toLocaleString()}</p>
                       </div>
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        d.status === "success"
+                        d.status === "running"
                           ? "bg-green-900/50 text-green-300"
                           : d.status === "failed"
                             ? "bg-red-900/50 text-red-300"
@@ -348,20 +354,36 @@ export default function DashboardPage() {
                       </span>
                     </div>
 
-                    {d.public_url && (
-                      <a
-                        href={d.public_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-orange-400 text-sm hover:underline mt-2 inline-block"
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingDeploymentId(d.id);
+                        }}
+                        className="text-orange-400 text-sm hover:underline"
                       >
-                        Open deployment
-                      </a>
-                    )}
+                        View logs
+                      </button>
+
+                      {d.public_url && (
+                        <a
+                          href={d.public_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-orange-400 text-sm hover:underline"
+                        >
+                          Open deployment
+                        </a>
+                      )}
+                    </div>
 
                     {d.status === "failed" && (
                       <button
-                        onClick={() => retryDeployment(d.id, d.repo_url, d.custom_port ?? d.detected_port)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          retryDeployment(d.id, d.repo_url, d.custom_port ?? d.detected_port);
+                        }}
                         className="mt-3 text-xs bg-zinc-800 text-zinc-100 px-3 py-1.5 rounded-md hover:bg-zinc-700"
                       >
                         Retry
@@ -374,6 +396,14 @@ export default function DashboardPage() {
           )}
         </main>
       </div>
+
+      {viewingDeploymentId && (
+        <DeploymentLogsModal
+          deploymentId={viewingDeploymentId}
+          initial={deployments.find((d) => d.id === viewingDeploymentId)}
+          onClose={() => setViewingDeploymentId(null)}
+        />
+      )}
     </div>
   );
 }

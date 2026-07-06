@@ -76,6 +76,10 @@ pub fn public_base_url() -> String {
 }
 
 fn public_base_url_for(environment: &str, configured: Option<&str>) -> String {
+    if let Some(value) = configured.map(str::trim).filter(|v| !v.is_empty()) {
+        return value.trim_end_matches('/').to_string();
+    }
+
     let environment = environment.trim().to_ascii_lowercase();
     if matches!(
         environment.as_str(),
@@ -84,12 +88,7 @@ fn public_base_url_for(environment: &str, configured: Option<&str>) -> String {
         return "http://localhost".to_string();
     }
 
-    configured
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .unwrap_or("https://dockcampus.sudelca.com")
-        .trim_end_matches('/')
-        .to_string()
+    "https://dockcampus.sudelca.com".to_string()
 }
 
 pub fn api_base_url() -> String {
@@ -99,6 +98,10 @@ pub fn api_base_url() -> String {
 }
 
 fn api_base_url_for(environment: &str, configured: Option<&str>) -> String {
+    if let Some(value) = configured.map(str::trim).filter(|v| !v.is_empty()) {
+        return value.trim_end_matches('/').to_string();
+    }
+
     let environment = environment.trim().to_ascii_lowercase();
     if matches!(
         environment.as_str(),
@@ -107,12 +110,7 @@ fn api_base_url_for(environment: &str, configured: Option<&str>) -> String {
         return "http://localhost:8001".to_string();
     }
 
-    configured
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .unwrap_or("https://api.sudelca.com")
-        .trim_end_matches('/')
-        .to_string()
+    "https://api.sudelca.com".to_string()
 }
 
 #[cfg(test)]
@@ -120,10 +118,15 @@ mod tests {
     use super::{api_base_url_for, public_base_url_for};
 
     #[test]
-    fn development_always_uses_localhost() {
+    fn development_defaults_to_localhost_when_unconfigured() {
+        assert_eq!(public_base_url_for("development", None), "http://localhost");
+    }
+
+    #[test]
+    fn explicit_base_url_overrides_development_environment() {
         assert_eq!(
             public_base_url_for("development", Some("https://dockcampus.sudelca.com")),
-            "http://localhost"
+            "https://dockcampus.sudelca.com"
         );
     }
 
@@ -144,10 +147,15 @@ mod tests {
     }
 
     #[test]
-    fn api_base_url_uses_localhost_in_development() {
+    fn api_base_url_defaults_to_localhost_when_unconfigured_in_development() {
+        assert_eq!(api_base_url_for("development", None), "http://localhost:8001");
+    }
+
+    #[test]
+    fn explicit_api_base_url_overrides_development_environment() {
         assert_eq!(
             api_base_url_for("development", Some("https://api.sudelca.com")),
-            "http://localhost:8001"
+            "https://api.sudelca.com"
         );
     }
 }
