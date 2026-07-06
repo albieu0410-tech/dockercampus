@@ -1,3 +1,5 @@
+FROM docker:cli AS dockercli
+
 FROM rust:latest AS builder
 WORKDIR /app
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
@@ -9,6 +11,7 @@ RUN cargo build --release
 
 FROM rust:latest
 RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 WORKDIR /app
 COPY --from=builder /app/target/release/container-engine .
 COPY --from=builder /app/src/db/migrations ./src/db/migrations
