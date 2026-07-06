@@ -5,14 +5,12 @@ DockCampus is a multi-service platform for managing student development containe
 ## Services
 
 - `frontend` (Next.js 15): web app for students/professors
-- `backend` (FastAPI): auth + user/container API gateway
-- `container-engine` (Rust + Axum): Docker/container orchestration + monitoring
+- `container-engine` (Rust + Axum): auth + Docker/container orchestration + monitoring API
 - `db` (PostgreSQL 16): persistent data store
 
 ## Repository Structure
 
-- `backend/` - Python FastAPI service
-- `container-engine/` - Rust service with SQLx migrations
+- `container-engine/` - Rust service with SQLx migrations (API gateway + orchestration)
 - `frontend/` - Next.js App Router UI
 - `student-container/` - code-server image
 - `docker-compose.yml` - local/dev orchestration
@@ -39,7 +37,6 @@ docker compose ps
 ## Default Ports
 
 - Frontend: `3000`
-- Backend: `8000`
 - Container Engine: `8001`
 - Postgres: `5432`
 
@@ -48,7 +45,7 @@ docker compose ps
 - Local machine: `http://localhost:3000`
 - LAN: `http://<raspberry-pi-ip>:3000`
 
-Backend is exposed on `http://<host>:8000` unless you place it behind a reverse proxy.
+Container Engine is exposed on `http://<host>:8001` unless you place it behind a reverse proxy.
 
 ## Frontend API Configuration
 
@@ -83,7 +80,7 @@ For `https://dockercampus.sudelca.com`:
 2. Forward ports `80`/`443` to the host.
 3. Use reverse proxy (Nginx/Caddy):
    - `/` -> `frontend:3000`
-   - `/api` (or API subdomain) -> `backend:8000`
+   - `/api` (or API subdomain) -> `container-engine:8001`
 4. Use TLS (Let's Encrypt).
 5. Set `NEXT_PUBLIC_API_URL` to the real HTTPS API URL, then rebuild.
 
@@ -95,7 +92,6 @@ docker compose up --build -d
 
 # View logs
 docker compose logs -f frontend
-docker compose logs -f backend
 docker compose logs -f container-engine
 
 # Stop
