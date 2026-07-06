@@ -130,15 +130,20 @@ export async function createContainer(userId: string | number) {
   });
 }
 
-export async function containerAction(id: string, action: "start" | "stop" | "restart") {
-  return request(`/containers/${id}/action`, {
-    method: "POST",
-    body: JSON.stringify({ action }),
-  });
+export async function containerAction(userId: string, action: "start" | "stop" | "restart") {
+  if (action === "restart") {
+    await request(`/containers/${userId}/stop`, { method: "POST" });
+    return request(`/containers/${userId}/start`, { method: "POST" });
+  }
+  return request(`/containers/${userId}/${action}`, { method: "POST" });
 }
 
-export async function deleteContainer(id: string) {
-  return request(`/containers/${id}`, { method: "DELETE" });
+export async function wakeContainer(userId: string) {
+  return request(`/containers/${userId}/wake`, { method: "POST" });
+}
+
+export async function deleteContainer(userId: string) {
+  return request(`/containers/${userId}/delete`, { method: "DELETE" });
 }
 
 // -- GitHub -------------------------------------------------------------------

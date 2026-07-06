@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   getMe, listStudents, listContainers, createContainer,
-  containerAction, deleteContainer, createDeployment, listDeployments,
+  containerAction, deleteContainer, wakeContainer, createDeployment, listDeployments,
   type User, type Container, type Deployment
 } from "@/lib/api";
 import Navbar from "@/components/Navbar";
@@ -79,21 +79,31 @@ export default function ProfessorPage() {
     }
   }
 
-  async function handleContainerAction(id: string, action: "start" | "stop" | "restart") {
+  async function handleContainerAction(id: string, userId: string, action: "start" | "stop" | "restart") {
     setActionLoading(id + action);
     try {
-      await containerAction(id, action);
+      await containerAction(userId, action);
       await load();
     } finally {
       setActionLoading(null);
     }
   }
 
-  async function handleDeleteContainer(id: string) {
+  async function handleWakeContainer(id: string, userId: string) {
+    setActionLoading(id + "wake");
+    try {
+      await wakeContainer(userId);
+      await load();
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDeleteContainer(id: string, userId: string) {
     if (!confirm("Delete this container?")) return;
     setActionLoading(id + "delete");
     try {
-      await deleteContainer(id);
+      await deleteContainer(userId);
       await load();
     } finally {
       setActionLoading(null);
@@ -231,9 +241,18 @@ export default function ProfessorPage() {
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {c.status !== "running" && (
+                      {c.status === "sleeping" && (
                         <button
-                          onClick={() => handleContainerAction(c.id, "start")}
+                          onClick={() => handleWakeContainer(c.id, c.user_id)}
+                          disabled={!!actionLoading}
+                          className="text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-md hover:opacity-90 disabled:opacity-50"
+                        >
+                          {actionLoading === c.id + "wake" ? "..." : "Wake"}
+                        </button>
+                      )}
+                      {c.status !== "running" && c.status !== "sleeping" && (
+                        <button
+                          onClick={() => handleContainerAction(c.id, c.user_id, "start")}
                           disabled={!!actionLoading}
                           className="text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-md hover:opacity-90 disabled:opacity-50"
                         >
@@ -243,14 +262,14 @@ export default function ProfessorPage() {
                       {c.status === "running" && (
                         <>
                           <button
-                            onClick={() => handleContainerAction(c.id, "stop")}
+                            onClick={() => handleContainerAction(c.id, c.user_id, "stop")}
                             disabled={!!actionLoading}
                             className="text-xs bg-muted text-foreground px-3 py-1.5 rounded-md hover:opacity-80 disabled:opacity-50"
                           >
                             {actionLoading === c.id + "stop" ? "..." : "Stop"}
                           </button>
                           <button
-                            onClick={() => handleContainerAction(c.id, "restart")}
+                            onClick={() => handleContainerAction(c.id, c.user_id, "restart")}
                             disabled={!!actionLoading}
                             className="text-xs bg-muted text-foreground px-3 py-1.5 rounded-md hover:opacity-80 disabled:opacity-50"
                           >
@@ -259,7 +278,7 @@ export default function ProfessorPage() {
                         </>
                       )}
                       <button
-                        onClick={() => handleDeleteContainer(c.id)}
+                        onClick={() => handleDeleteContainer(c.id, c.user_id)}
                         disabled={!!actionLoading}
                         className="text-xs bg-destructive text-destructive-foreground px-3 py-1.5 rounded-md hover:opacity-90 disabled:opacity-50"
                       >

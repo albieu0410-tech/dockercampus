@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getMe, listContainers, containerAction, deleteContainer, type User, type Container } from "@/lib/api";
+import { getMe, listContainers, containerAction, deleteContainer, wakeContainer, type User, type Container } from "@/lib/api";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import { useRouter } from "next/navigation";
@@ -16,7 +16,7 @@ export default function ContainerDetailPage() {
   async function load() {
     const [me, conts] = await Promise.all([getMe(), listContainers()]);
     setUser(me);
-    setContainer(conts.find((c) => c.container_id === id) ?? null);
+    setContainer(conts.find((c) => c.user_id === id) ?? null);
   }
 
   useEffect(() => { load(); }, [id]);
@@ -25,6 +25,16 @@ export default function ContainerDetailPage() {
     setLoading(true);
     try {
       await containerAction(id, action);
+      await load();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function doWake() {
+    setLoading(true);
+    try {
+      await wakeContainer(id);
       await load();
     } finally {
       setLoading(false);
@@ -40,6 +50,7 @@ export default function ContainerDetailPage() {
   if (!user || !container) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
   const isRunning = container.status === "running";
+  const isSleeping = container.status === "sleeping";
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -52,8 +63,8 @@ export default function ContainerDetailPage() {
         <div className="bg-card border rounded-xl p-6 space-y-4">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-xl font-bold">{container.name}</h2>
-              <p className="text-sm text-muted-foreground">{container.image}</p>
+              <h2 className="text-xl font-bold">{container.name || "My Environment"}</h2>
+              <p className="text-sm text-muted-foreground">Port {container.port}</p>
             </div>
             <span className={`text-xs px-2 py-1 rounded-full font-medium ${isRunning ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>
               {container.status}
@@ -63,7 +74,7 @@ export default function ContainerDetailPage() {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground">Container ID</p>
-              <p className="font-mono text-xs mt-1 break-all">{container.container_id}</p>
+              <p className="font-mono text-xs mt-1 break-all">{container.docker_container_id ?? "-"}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Created</p>
@@ -71,8 +82,22 @@ export default function ContainerDetailPage() {
             </div>
           </div>
 
+          {isRunning && (
+            <a
+              href={container.editor_url ?? undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full text-center text-sm bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 font-medium"
+            >
+              Open Editor
+            </a>
+          )}
+
           <div className="flex gap-2 flex-wrap pt-2">
-            {!isRunning && (
+            {isSleeping && (
+              <button onClick={doWake} disabled={loading} className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 disabled:opacity-50">Wake</button>
+            )}
+            {!isRunning && !isSleeping && (
               <button onClick={() => doAction("start")} disabled={loading} className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 disabled:opacity-50">Start</button>
             )}
             {isRunning && (

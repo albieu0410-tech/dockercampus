@@ -1,5 +1,5 @@
 "use client";
-import { APP_URL, containerAction, deleteContainer, type Container } from "@/lib/api";
+import { APP_URL, containerAction, deleteContainer, wakeContainer, type Container } from "@/lib/api";
 import { useState } from "react";
 
 export default function ContainerCard({
@@ -14,7 +14,17 @@ export default function ContainerCard({
   async function doAction(action: "start" | "stop" | "restart") {
     setLoading(true);
     try {
-      await containerAction(container.id, action);
+      await containerAction(container.user_id, action);
+      onRefresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function doWake() {
+    setLoading(true);
+    try {
+      await wakeContainer(container.user_id);
       onRefresh();
     } finally {
       setLoading(false);
@@ -25,7 +35,7 @@ export default function ContainerCard({
     if (!confirm("Delete this container?")) return;
     setLoading(true);
     try {
-      await deleteContainer(container.id);
+      await deleteContainer(container.user_id);
       onRefresh();
     } finally {
       setLoading(false);
@@ -33,6 +43,7 @@ export default function ContainerCard({
   }
 
   const isRunning = container.status === "running";
+  const isSleeping = container.status === "sleeping";
   const editorUrl = container.editor_url || `${APP_URL}/app/${container.user_id}/`;
 
   return (
@@ -65,7 +76,16 @@ export default function ContainerCard({
       )}
 
       <div className="flex gap-2 flex-wrap">
-        {!isRunning && (
+        {isSleeping && (
+          <button
+            onClick={doWake}
+            disabled={loading}
+            className="text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-md hover:opacity-90 disabled:opacity-50"
+          >
+            Wake
+          </button>
+        )}
+        {!isRunning && !isSleeping && (
           <button
             onClick={() => doAction("start")}
             disabled={loading}
