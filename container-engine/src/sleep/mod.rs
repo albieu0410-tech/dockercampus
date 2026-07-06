@@ -1,25 +1,26 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::Row;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{errors::Result, state::AppState};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct SleepConfig {
     pub enabled: bool,
     pub idle_sleep_minutes: i64,
     pub scan_interval_seconds: u64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct SleepCandidate {
     pub user_id: Uuid,
     pub docker_container_id: Option<String>,
     pub last_activity: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct SleepReport {
     pub scanned: usize,
     pub slept: usize,
@@ -28,7 +29,7 @@ pub struct SleepReport {
     pub idle_minutes: i64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct SleepStatus {
     pub config: SleepConfig,
     pub running: i64,

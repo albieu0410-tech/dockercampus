@@ -9,6 +9,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::{
@@ -34,14 +35,14 @@ pub fn router() -> Router<Arc<AppState>> {
         )
 }
 
-#[derive(Debug, Deserialize)]
-struct ClassCreate {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct ClassCreate {
     name: String,
     description: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-struct ClassOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct ClassOut {
     id: Uuid,
     name: String,
     description: Option<String>,
@@ -49,14 +50,14 @@ struct ClassOut {
     created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize)]
-struct Pagination {
+#[derive(Debug, Deserialize, IntoParams)]
+pub(crate) struct Pagination {
     page: Option<i64>,
     limit: Option<i64>,
 }
 
-#[derive(Debug, Serialize)]
-struct UserOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct UserOut {
     id: Uuid,
     email: String,
     full_name: String,
@@ -66,20 +67,32 @@ struct UserOut {
     created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize)]
-struct ClassMembershipCreate {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct ClassMembershipCreate {
     user_id: Uuid,
 }
 
-#[derive(Debug, Serialize)]
-struct ClassMembershipOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct ClassMembershipOut {
     id: Uuid,
     class_id: Uuid,
     user_id: Uuid,
     joined_at: DateTime<Utc>,
 }
 
-async fn create_class(
+#[utoipa::path(
+    post,
+    path = "/classes",
+    tag = "classes",
+    request_body = ClassCreate,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 201, description = "Class created", body = ClassOut),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires professor role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn create_class(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<ClassCreate>,
@@ -112,7 +125,18 @@ async fn create_class(
     ))
 }
 
-async fn list_classes(
+#[utoipa::path(
+    get,
+    path = "/classes",
+    tag = "classes",
+    params(Pagination),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Paginated list of classes (professor's own classes, or enrolled classes for students)", body = [ClassOut]),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn list_classes(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(paging): Query<Pagination>,
@@ -168,7 +192,20 @@ async fn list_classes(
     Ok(Json(out))
 }
 
-async fn get_class(
+#[utoipa::path(
+    get,
+    path = "/classes/{class_id}",
+    tag = "classes",
+    params(("class_id" = Uuid, Path, description = "Class ID")),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Class details", body = ClassOut),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Not your class", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Class not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn get_class(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(class_id): Path<Uuid>,
@@ -196,7 +233,21 @@ async fn get_class(
     }))
 }
 
-async fn update_class(
+#[utoipa::path(
+    patch,
+    path = "/classes/{class_id}",
+    tag = "classes",
+    params(("class_id" = Uuid, Path, description = "Class ID")),
+    request_body = ClassCreate,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Updated class", body = ClassOut),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires professor role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Class not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn update_class(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(class_id): Path<Uuid>,
@@ -237,7 +288,20 @@ async fn update_class(
     }))
 }
 
-async fn delete_class(
+#[utoipa::path(
+    delete,
+    path = "/classes/{class_id}",
+    tag = "classes",
+    params(("class_id" = Uuid, Path, description = "Class ID")),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 204, description = "Class deleted"),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires professor role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Class not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn delete_class(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(class_id): Path<Uuid>,
@@ -256,7 +320,20 @@ async fn delete_class(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn list_class_students(
+#[utoipa::path(
+    get,
+    path = "/classes/{class_id}/students",
+    tag = "classes",
+    params(("class_id" = Uuid, Path, description = "Class ID"), Pagination),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Paginated list of students in the class", body = [UserOut]),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires professor role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Class not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn list_class_students(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(class_id): Path<Uuid>,
@@ -310,7 +387,22 @@ async fn list_class_students(
     Ok(Json(out))
 }
 
-async fn add_student_to_class(
+#[utoipa::path(
+    post,
+    path = "/classes/{class_id}/students",
+    tag = "classes",
+    params(("class_id" = Uuid, Path, description = "Class ID")),
+    request_body = ClassMembershipCreate,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 201, description = "Student added to class", body = ClassMembershipOut),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires professor role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Class or user not found", body = crate::errors::ErrorResponse),
+        (status = 409, description = "User already in this class", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn add_student_to_class(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(class_id): Path<Uuid>,
@@ -369,7 +461,23 @@ async fn add_student_to_class(
     ))
 }
 
-async fn remove_student_from_class(
+#[utoipa::path(
+    delete,
+    path = "/classes/{class_id}/students/{user_id}",
+    tag = "classes",
+    params(
+        ("class_id" = Uuid, Path, description = "Class ID"),
+        ("user_id" = Uuid, Path, description = "Student user ID")
+    ),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 204, description = "Student removed from class"),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires professor role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Class not found or student not in this class", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn remove_student_from_class(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path((class_id, user_id)): Path<(Uuid, Uuid)>,

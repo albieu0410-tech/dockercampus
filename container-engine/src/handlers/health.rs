@@ -14,7 +14,15 @@ fn start_time() -> Instant {
     *START.get_or_init(Instant::now)
 }
 
-async fn health(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
+#[utoipa::path(
+    get,
+    path = "/health",
+    tag = "health",
+    responses(
+        (status = 200, description = "Service and database health status")
+    )
+)]
+pub(crate) async fn health(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let started = start_time();
     let db_started = Instant::now();
     let db_result = sqlx::query("SELECT 1").fetch_one(&state.db).await;

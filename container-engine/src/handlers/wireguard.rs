@@ -9,6 +9,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use utoipa::ToSchema;
 
 use crate::{
     errors::{AppError, Result},
@@ -25,8 +26,8 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/peers/:node_id/handshake", post(record_handshake))
 }
 
-#[derive(Debug, Serialize)]
-struct WireGuardStatusOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct WireGuardStatusOut {
     enabled: bool,
     configured: bool,
     interface: String,
@@ -36,7 +37,18 @@ struct WireGuardStatusOut {
     has_public_key: bool,
 }
 
-async fn get_status(
+#[utoipa::path(
+    get,
+    path = "/wireguard/status",
+    tag = "wireguard",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "WireGuard interface configuration status", body = WireGuardStatusOut),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin or professor role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn get_status(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<WireGuardStatusOut>> {
@@ -55,8 +67,8 @@ async fn get_status(
     }))
 }
 
-#[derive(Debug, Serialize)]
-struct WireGuardPeerOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct WireGuardPeerOut {
     id: String,
     node_id: String,
     public_key: String,
@@ -68,7 +80,18 @@ struct WireGuardPeerOut {
     updated_at: String,
 }
 
-async fn list_peers(
+#[utoipa::path(
+    get,
+    path = "/wireguard/peers",
+    tag = "wireguard",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "List of WireGuard peers", body = [WireGuardPeerOut]),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin or professor role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn list_peers(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<WireGuardPeerOut>>> {
@@ -107,8 +130,8 @@ async fn list_peers(
     Ok(Json(peers))
 }
 
-#[derive(Debug, Deserialize)]
-struct UpsertPeerRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct UpsertPeerRequest {
     node_id: String,
     public_key: Option<String>,
     preshared_key: Option<String>,
@@ -117,7 +140,20 @@ struct UpsertPeerRequest {
     is_active: Option<bool>,
 }
 
-async fn upsert_peer(
+#[utoipa::path(
+    post,
+    path = "/wireguard/peers",
+    tag = "wireguard",
+    request_body = UpsertPeerRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Peer created or updated", body = WireGuardPeerOut),
+        (status = 400, description = "Invalid node_id, key, or allowed_ips", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn upsert_peer(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<UpsertPeerRequest>,
@@ -190,8 +226,8 @@ async fn upsert_peer(
     Ok((StatusCode::OK, Json(peer_from_row(&row)?)))
 }
 
-#[derive(Debug, Deserialize)]
-struct UpdatePeerRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct UpdatePeerRequest {
     public_key: Option<String>,
     preshared_key: Option<String>,
     allowed_ips: Option<String>,
@@ -199,7 +235,22 @@ struct UpdatePeerRequest {
     is_active: Option<bool>,
 }
 
-async fn update_peer(
+#[utoipa::path(
+    put,
+    path = "/wireguard/peers/{node_id}",
+    tag = "wireguard",
+    params(("node_id" = String, Path, description = "Hive node ID")),
+    request_body = UpdatePeerRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Peer updated", body = WireGuardPeerOut),
+        (status = 400, description = "Invalid node_id, key, allowed_ips, or no fields provided", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "WireGuard peer not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn update_peer(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(node_id): Path<String>,
@@ -296,12 +347,27 @@ async fn update_peer(
     Ok(Json(peer_from_row(&row)?))
 }
 
-#[derive(Debug, Deserialize)]
-struct HandshakeRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct HandshakeRequest {
     at: Option<DateTime<Utc>>,
 }
 
-async fn record_handshake(
+#[utoipa::path(
+    post,
+    path = "/wireguard/peers/{node_id}/handshake",
+    tag = "wireguard",
+    params(("node_id" = String, Path, description = "Hive node ID")),
+    request_body = HandshakeRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Handshake timestamp recorded"),
+        (status = 400, description = "node_id is required", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin or professor role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "WireGuard peer not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn record_handshake(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(node_id): Path<String>,

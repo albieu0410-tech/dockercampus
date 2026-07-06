@@ -10,7 +10,15 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/health", get(health_check))
 }
 
-async fn get_stats(State(state): State<Arc<AppState>>) -> Result<Json<serde_json::Value>> {
+#[utoipa::path(
+    get,
+    path = "/monitor/stats",
+    tag = "monitor",
+    responses(
+        (status = 200, description = "Docker and database container statistics")
+    )
+)]
+pub(crate) async fn get_stats(State(state): State<Arc<AppState>>) -> Result<Json<serde_json::Value>> {
     let system_stats = state.docker.get_system_stats().await?;
 
     let db_containers = sqlx::query(
@@ -43,7 +51,15 @@ async fn get_stats(State(state): State<Arc<AppState>>) -> Result<Json<serde_json
     })))
 }
 
-async fn health_check() -> Json<serde_json::Value> {
+#[utoipa::path(
+    get,
+    path = "/monitor/health",
+    tag = "monitor",
+    responses(
+        (status = 200, description = "Container engine liveness check")
+    )
+)]
+pub(crate) async fn health_check() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "status": "ok",
         "service": "container-engine",

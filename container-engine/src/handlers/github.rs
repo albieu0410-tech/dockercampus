@@ -9,6 +9,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::{
@@ -28,12 +29,22 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/file", get(get_file_content))
 }
 
-#[derive(Debug, Deserialize)]
-struct LoginQuery {
+#[derive(Debug, Deserialize, IntoParams)]
+pub(crate) struct LoginQuery {
     token: String,
 }
 
-async fn github_login(
+#[utoipa::path(
+    get,
+    path = "/auth/github/login",
+    tag = "github",
+    params(LoginQuery),
+    responses(
+        (status = 307, description = "Redirect to GitHub OAuth authorize URL"),
+        (status = 401, description = "Invalid token", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn github_login(
     State(state): State<Arc<AppState>>,
     Query(query): Query<LoginQuery>,
 ) -> Result<Redirect> {
@@ -52,13 +63,23 @@ async fn github_login(
     Ok(Redirect::temporary(&url))
 }
 
-#[derive(Debug, Deserialize)]
-struct CallbackQuery {
+#[derive(Debug, Deserialize, IntoParams)]
+pub(crate) struct CallbackQuery {
     code: String,
     state: String,
 }
 
-async fn github_callback(
+#[utoipa::path(
+    get,
+    path = "/auth/github/callback",
+    tag = "github",
+    params(CallbackQuery),
+    responses(
+        (status = 307, description = "Redirect back to the frontend dashboard"),
+        (status = 400, description = "Failed to exchange code or resolve GitHub user", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn github_callback(
     State(state): State<Arc<AppState>>,
     Query(query): Query<CallbackQuery>,
 ) -> Result<Redirect> {
@@ -147,14 +168,24 @@ async fn github_callback(
     )))
 }
 
-#[derive(Debug, Serialize)]
-struct GithubConnectionOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct GithubConnectionOut {
     id: Uuid,
     github_username: String,
     created_at: chrono::DateTime<chrono::Utc>,
 }
 
-async fn github_status(
+#[utoipa::path(
+    get,
+    path = "/auth/github/status",
+    tag = "github",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "GitHub connection status for the current user (null if not connected)", body = Option<GithubConnectionOut>),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn github_status(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<Option<GithubConnectionOut>>> {
@@ -178,8 +209,8 @@ async fn github_status(
     Ok(Json(out))
 }
 
-#[derive(Debug, Serialize)]
-struct RepoOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct RepoOut {
     name: String,
     full_name: String,
     url: String,
@@ -188,7 +219,19 @@ struct RepoOut {
     updated_at: String,
 }
 
-async fn list_repos(
+#[utoipa::path(
+    get,
+    path = "/auth/github/repos",
+    tag = "github",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "The user's GitHub repositories", body = [RepoOut]),
+        (status = 400, description = "Failed to fetch repositories from GitHub", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 404, description = "GitHub not connected", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn list_repos(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<RepoOut>>> {
@@ -249,21 +292,35 @@ async fn list_repos(
     Ok(Json(out))
 }
 
-#[derive(Debug, Deserialize)]
-struct TreeQuery {
+#[derive(Debug, Deserialize, IntoParams)]
+pub(crate) struct TreeQuery {
     repo: String,
     #[serde(rename = "ref")]
+    #[param(rename = "ref")]
     ref_: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-struct TreeItem {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct TreeItem {
     path: String,
     r#type: String,
     size: Option<i64>,
 }
 
-async fn get_repo_tree(
+#[utoipa::path(
+    get,
+    path = "/auth/github/tree",
+    tag = "github",
+    params(TreeQuery),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Recursive file tree for the given repo and ref"),
+        (status = 400, description = "GitHub API error", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Repo not found or private", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn get_repo_tree(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(query): Query<TreeQuery>,
@@ -329,15 +386,28 @@ async fn get_repo_tree(
     })))
 }
 
-#[derive(Debug, Deserialize)]
-struct FileQuery {
+#[derive(Debug, Deserialize, IntoParams)]
+pub(crate) struct FileQuery {
     repo: String,
     path: String,
     #[serde(rename = "ref")]
+    #[param(rename = "ref")]
     ref_: Option<String>,
 }
 
-async fn get_file_content(
+#[utoipa::path(
+    get,
+    path = "/auth/github/file",
+    tag = "github",
+    params(FileQuery),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Raw file content from the repo"),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 404, description = "File not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn get_file_content(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(query): Query<FileQuery>,

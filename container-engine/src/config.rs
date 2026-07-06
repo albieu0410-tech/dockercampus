@@ -92,9 +92,32 @@ fn public_base_url_for(environment: &str, configured: Option<&str>) -> String {
         .to_string()
 }
 
+pub fn api_base_url() -> String {
+    let environment = env::var("ENVIRONMENT").unwrap_or_default();
+    let configured = env::var("API_BASE_URL").ok();
+    api_base_url_for(&environment, configured.as_deref())
+}
+
+fn api_base_url_for(environment: &str, configured: Option<&str>) -> String {
+    let environment = environment.trim().to_ascii_lowercase();
+    if matches!(
+        environment.as_str(),
+        "local" | "development" | "dev" | "test"
+    ) {
+        return "http://localhost:8001".to_string();
+    }
+
+    configured
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("https://api.sudelca.com")
+        .trim_end_matches('/')
+        .to_string()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::public_base_url_for;
+    use super::{api_base_url_for, public_base_url_for};
 
     #[test]
     fn development_always_uses_localhost() {
@@ -109,6 +132,22 @@ mod tests {
         assert_eq!(
             public_base_url_for("production", Some("https://dockcampus.example/")),
             "https://dockcampus.example"
+        );
+    }
+
+    #[test]
+    fn api_base_url_defaults_to_sudelca_in_production() {
+        assert_eq!(
+            api_base_url_for("production", None),
+            "https://api.sudelca.com"
+        );
+    }
+
+    #[test]
+    fn api_base_url_uses_localhost_in_development() {
+        assert_eq!(
+            api_base_url_for("development", Some("https://api.sudelca.com")),
+            "http://localhost:8001"
         );
     }
 }

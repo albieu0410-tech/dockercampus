@@ -15,23 +15,24 @@ use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use std::sync::Arc;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreateContainerRequest {
     pub user_id: Uuid,
     pub memory_limit_mb: Option<i32>,
     pub cpu_limit: Option<f64>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct CreateContainerResponse {
     pub container_id: String,
     pub port: i32,
     pub editor_url: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct ExecRequest {
     pub command: String,
 }
@@ -113,7 +114,15 @@ fn sanitize_command(cmd: &str) -> Result<String> {
     Ok(cmd.to_string())
 }
 
-async fn list_containers(State(state): State<Arc<AppState>>) -> Result<Json<serde_json::Value>> {
+#[utoipa::path(
+    get,
+    path = "/containers",
+    tag = "containers",
+    responses(
+        (status = 200, description = "List of all student containers with status and editor URLs")
+    )
+)]
+pub(crate) async fn list_containers(State(state): State<Arc<AppState>>) -> Result<Json<serde_json::Value>> {
     let base_url = public_base_url();
     let containers = sqlx::query(
         r#"
@@ -146,7 +155,17 @@ async fn list_containers(State(state): State<Arc<AppState>>) -> Result<Json<serd
     Ok(Json(serde_json::Value::Array(out)))
 }
 
-async fn create_container(
+#[utoipa::path(
+    post,
+    path = "/containers/create",
+    tag = "containers",
+    request_body = CreateContainerRequest,
+    responses(
+        (status = 200, description = "Container created and started", body = CreateContainerResponse),
+        (status = 503, description = "Container resource limit exceeded", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn create_container(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<CreateContainerRequest>,
 ) -> Result<Json<CreateContainerResponse>> {
@@ -204,7 +223,17 @@ async fn create_container(
     }))
 }
 
-async fn start_container(
+#[utoipa::path(
+    post,
+    path = "/containers/{user_id}/start",
+    tag = "containers",
+    params(("user_id" = Uuid, Path, description = "Student user ID")),
+    responses(
+        (status = 200, description = "Container started"),
+        (status = 404, description = "Container not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn start_container(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
@@ -237,7 +266,16 @@ async fn start_container(
     })))
 }
 
-async fn wake_container(
+#[utoipa::path(
+    post,
+    path = "/containers/{user_id}/wake",
+    tag = "containers",
+    params(("user_id" = Uuid, Path, description = "Student user ID")),
+    responses(
+        (status = 200, description = "Container woken up, or already not sleeping")
+    )
+)]
+pub(crate) async fn wake_container(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
@@ -278,7 +316,17 @@ async fn wake_container(
     Ok(Json(serde_json::json!({ "status": "awake" })))
 }
 
-async fn stop_container(
+#[utoipa::path(
+    post,
+    path = "/containers/{user_id}/stop",
+    tag = "containers",
+    params(("user_id" = Uuid, Path, description = "Student user ID")),
+    responses(
+        (status = 200, description = "Container stopped"),
+        (status = 404, description = "Container not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn stop_container(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
@@ -305,7 +353,17 @@ async fn stop_container(
     })))
 }
 
-async fn delete_container(
+#[utoipa::path(
+    delete,
+    path = "/containers/{user_id}/delete",
+    tag = "containers",
+    params(("user_id" = Uuid, Path, description = "Student user ID")),
+    responses(
+        (status = 200, description = "Container removed and port released"),
+        (status = 404, description = "Container not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn delete_container(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
@@ -339,7 +397,17 @@ async fn delete_container(
     })))
 }
 
-async fn get_container_stats(
+#[utoipa::path(
+    get,
+    path = "/containers/{user_id}/stats",
+    tag = "containers",
+    params(("user_id" = Uuid, Path, description = "Student user ID")),
+    responses(
+        (status = 200, description = "Live CPU/memory stats for the container"),
+        (status = 404, description = "Container not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn get_container_stats(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
@@ -363,7 +431,19 @@ async fn get_container_stats(
     })))
 }
 
-async fn exec_in_container(
+#[utoipa::path(
+    post,
+    path = "/containers/{user_id}/exec",
+    tag = "containers",
+    params(("user_id" = Uuid, Path, description = "Student user ID")),
+    request_body = ExecRequest,
+    responses(
+        (status = 200, description = "Command output"),
+        (status = 400, description = "Command blocked or exceeds max length", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Container not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn exec_in_container(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<Uuid>,
     Json(payload): Json<ExecRequest>,
@@ -400,7 +480,17 @@ struct ProxyTarget {
     docker_container_id: Option<String>,
 }
 
-async fn proxy_container_root_get(
+#[utoipa::path(
+    get,
+    path = "/containers/app/{user_id}",
+    tag = "containers",
+    params(("user_id" = String, Path, description = "Student user ID")),
+    responses(
+        (status = 200, description = "Proxied response from the student's code-server container root"),
+        (status = 503, description = "Container is sleeping/waking or not running")
+    )
+)]
+pub(crate) async fn proxy_container_root_get(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,
     RawQuery(query): RawQuery,
@@ -409,7 +499,20 @@ async fn proxy_container_root_get(
     proxy_http_inner(&state, &user_id, "", query, Method::GET, headers, None).await
 }
 
-async fn proxy_to_container_http(
+#[utoipa::path(
+    post,
+    path = "/containers/app/{user_id}/{path}",
+    tag = "containers",
+    params(
+        ("user_id" = String, Path, description = "Student user ID"),
+        ("path" = String, Path, description = "Sub-path forwarded to the container (also handles PUT, PATCH, DELETE, OPTIONS, HEAD)")
+    ),
+    responses(
+        (status = 200, description = "Proxied response from the student's code-server container"),
+        (status = 503, description = "Container is sleeping/waking or not running")
+    )
+)]
+pub(crate) async fn proxy_to_container_http(
     State(state): State<Arc<AppState>>,
     Path((user_id, path)): Path<(String, String)>,
     RawQuery(query): RawQuery,
@@ -420,7 +523,21 @@ async fn proxy_to_container_http(
     proxy_http_inner(&state, &user_id, &path, query, method, headers, Some(body)).await
 }
 
-async fn proxy_or_ws_to_container_get(
+#[utoipa::path(
+    get,
+    path = "/containers/app/{user_id}/{path}",
+    tag = "containers",
+    params(
+        ("user_id" = String, Path, description = "Student user ID"),
+        ("path" = String, Path, description = "Sub-path forwarded to the container")
+    ),
+    responses(
+        (status = 101, description = "WebSocket upgrade bridged to the container"),
+        (status = 200, description = "Proxied HTTP response from the student's code-server container"),
+        (status = 503, description = "Container is sleeping/waking or not running")
+    )
+)]
+pub(crate) async fn proxy_or_ws_to_container_get(
     ws: Option<WebSocketUpgrade>,
     State(state): State<Arc<AppState>>,
     Path((user_id, path)): Path<(String, String)>,

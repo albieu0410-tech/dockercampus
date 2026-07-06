@@ -20,7 +20,18 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/cleanup", post(cleanup_resources))
 }
 
-async fn get_storage_breakdown(
+#[utoipa::path(
+    get,
+    path = "/resources/storage",
+    tag = "resources",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Disk, Docker, and log storage breakdown"),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin or professor role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn get_storage_breakdown(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>> {
@@ -38,7 +49,18 @@ async fn get_storage_breakdown(
     })))
 }
 
-async fn cleanup_resources(
+#[utoipa::path(
+    post,
+    path = "/resources/cleanup",
+    tag = "resources",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Docker image and build cache cleanup summary"),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn cleanup_resources(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>> {

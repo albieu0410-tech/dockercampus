@@ -7,6 +7,7 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
+use utoipa::IntoParams;
 
 use crate::{
     errors::Result,
@@ -22,7 +23,18 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/candidates", get(candidates))
 }
 
-async fn status(
+#[utoipa::path(
+    get,
+    path = "/sleep/status",
+    tag = "sleep",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Current sleep manager configuration and container counts", body = sleep::SleepStatus),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin or professor role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn status(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<sleep::SleepStatus>> {
@@ -32,7 +44,18 @@ async fn status(
     Ok(Json(sleep::get_status(&state).await?))
 }
 
-async fn run_once(
+#[utoipa::path(
+    post,
+    path = "/sleep/run",
+    tag = "sleep",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Sleep sweep report", body = sleep::SleepReport),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn run_once(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<sleep::SleepReport>> {
@@ -42,12 +65,24 @@ async fn run_once(
     Ok(Json(sleep::run_once(&state).await?))
 }
 
-#[derive(Debug, Deserialize)]
-struct CandidateQuery {
+#[derive(Debug, Deserialize, IntoParams)]
+pub(crate) struct CandidateQuery {
     limit: Option<i64>,
 }
 
-async fn candidates(
+#[utoipa::path(
+    get,
+    path = "/sleep/candidates",
+    tag = "sleep",
+    params(CandidateQuery),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Containers idle-eligible for sleep", body = [sleep::SleepCandidate]),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin or professor role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn candidates(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(query): Query<CandidateQuery>,

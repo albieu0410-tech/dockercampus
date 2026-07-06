@@ -11,6 +11,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
@@ -38,20 +39,26 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/health", get(health))
 }
 
-async fn health() -> Json<serde_json::Value> {
+#[utoipa::path(
+    get,
+    path = "/auth/health",
+    tag = "auth",
+    responses((status = 200, description = "Auth service liveness check"))
+)]
+pub(crate) async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "ok": true }))
 }
 
-#[derive(Debug, Deserialize)]
-struct RegisterRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct RegisterRequest {
     email: String,
     password: String,
     full_name: String,
     invite_code: String,
 }
 
-#[derive(Debug, Serialize)]
-struct UserOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct UserOut {
     id: Uuid,
     email: String,
     full_name: String,
@@ -61,7 +68,18 @@ struct UserOut {
     created_at: DateTime<Utc>,
 }
 
-async fn register(
+#[utoipa::path(
+    post,
+    path = "/auth/register",
+    tag = "auth",
+    request_body = RegisterRequest,
+    responses(
+        (status = 201, description = "Account created", body = UserOut),
+        (status = 400, description = "Invalid invite code, email domain, or password strength", body = crate::errors::ErrorResponse),
+        (status = 409, description = "Email already registered", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn register(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RegisterRequest>,
 ) -> Result<(StatusCode, Json<UserOut>)> {
@@ -143,20 +161,32 @@ async fn register(
     ))
 }
 
-#[derive(Debug, Deserialize)]
-struct LoginRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct LoginRequest {
     email: String,
     password: String,
 }
 
-#[derive(Debug, Serialize)]
-struct LoginResponse {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct LoginResponse {
     access_token: Option<String>,
     otp_session_id: Option<Uuid>,
     message: Option<String>,
 }
 
-async fn login(
+#[utoipa::path(
+    post,
+    path = "/auth/login",
+    tag = "auth",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Access token, or an OTP session if 2FA is required", body = LoginResponse),
+        (status = 401, description = "Invalid credentials", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Account disabled", body = crate::errors::ErrorResponse),
+        (status = 429, description = "Account locked from too many failed attempts", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn login(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>> {
@@ -328,19 +358,32 @@ mod tests {
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct VerifyOtpRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct VerifyOtpRequest {
     otp_session_id: Uuid,
     otp_code: String,
 }
 
-#[derive(Debug, Serialize)]
-struct TokenResponse {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct TokenResponse {
     access_token: String,
     token_type: String,
 }
 
-async fn verify_otp(
+#[utoipa::path(
+    post,
+    path = "/auth/verify-otp",
+    tag = "auth",
+    request_body = VerifyOtpRequest,
+    responses(
+        (status = 200, description = "OTP verified, access token issued", body = TokenResponse),
+        (status = 400, description = "OTP session expired", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Invalid OTP code", body = crate::errors::ErrorResponse),
+        (status = 404, description = "OTP session not found", body = crate::errors::ErrorResponse),
+        (status = 429, description = "Too many attempts", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn verify_otp(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<VerifyOtpRequest>,
 ) -> Result<Json<TokenResponse>> {
@@ -426,12 +469,21 @@ async fn verify_otp(
     }))
 }
 
-#[derive(Debug, Deserialize)]
-struct ForgotPasswordRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct ForgotPasswordRequest {
     email: String,
 }
 
-async fn forgot_password(
+#[utoipa::path(
+    post,
+    path = "/auth/forgot-password",
+    tag = "auth",
+    request_body = ForgotPasswordRequest,
+    responses(
+        (status = 200, description = "A reset link is sent if the email exists (response is the same either way)")
+    )
+)]
+pub(crate) async fn forgot_password(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<ForgotPasswordRequest>,
 ) -> Result<Json<serde_json::Value>> {
@@ -469,13 +521,23 @@ async fn forgot_password(
     })))
 }
 
-#[derive(Debug, Deserialize)]
-struct ResetPasswordRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct ResetPasswordRequest {
     token: String,
     new_password: String,
 }
 
-async fn reset_password(
+#[utoipa::path(
+    post,
+    path = "/auth/reset-password",
+    tag = "auth",
+    request_body = ResetPasswordRequest,
+    responses(
+        (status = 200, description = "Password updated successfully"),
+        (status = 400, description = "Invalid, expired reset token, or weak password", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn reset_password(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<ResetPasswordRequest>,
 ) -> Result<Json<serde_json::Value>> {
@@ -532,15 +594,15 @@ async fn reset_password(
     ))
 }
 
-#[derive(Debug, Deserialize)]
-struct InviteCodeCreate {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct InviteCodeCreate {
     role: Option<String>,
     expires_at: Option<DateTime<Utc>>,
     class_id: Option<Uuid>,
 }
 
-#[derive(Debug, Serialize)]
-struct InviteCodeOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct InviteCodeOut {
     id: Uuid,
     code: String,
     role: String,
@@ -550,7 +612,20 @@ struct InviteCodeOut {
     class_id: Option<Uuid>,
 }
 
-async fn create_invite_code(
+#[utoipa::path(
+    post,
+    path = "/auth/invite-codes",
+    tag = "auth",
+    request_body = InviteCodeCreate,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 201, description = "Invite code created", body = InviteCodeOut),
+        (status = 400, description = "Invalid role", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn create_invite_code(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<InviteCodeCreate>,
@@ -594,7 +669,18 @@ async fn create_invite_code(
     ))
 }
 
-async fn list_invite_codes(
+#[utoipa::path(
+    get,
+    path = "/auth/invite-codes",
+    tag = "auth",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "List of invite codes", body = [InviteCodeOut]),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn list_invite_codes(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<InviteCodeOut>>> {

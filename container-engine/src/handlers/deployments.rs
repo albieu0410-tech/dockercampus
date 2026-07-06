@@ -18,41 +18,42 @@ use sqlx::Row;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info};
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::errors::{AppError, Result};
 use crate::middleware::auth::{current_user, require_any_role, require_role};
 use crate::state::AppState;
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, ToSchema)]
 pub struct BuildRequest {
     pub user_id: String,
     pub image_tag: String,
     pub container_name: String,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, ToSchema)]
 pub struct BuildResponse {
     pub success: bool,
     pub output: String,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, ToSchema)]
 pub struct RunRequest {
     pub image_tag: String,
     pub container_name: String,
     pub port: i32,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, ToSchema)]
 pub struct RunResponse {
     pub success: bool,
     pub output: String,
     pub container_id: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct CreateDeploymentRequest {
+#[derive(Deserialize, ToSchema)]
+pub(crate) struct CreateDeploymentRequest {
     repo_url: String,
     custom_port: Option<i32>,
 }
@@ -66,8 +67,8 @@ const STATUS_RUNNING: &str = "running";
 const STATUS_FAILED: &str = "failed";
 const STATUS_CANCELLED: &str = "cancelled";
 
-#[derive(Serialize)]
-struct DeploymentOut {
+#[derive(Serialize, ToSchema)]
+pub(crate) struct DeploymentOut {
     id: Uuid,
     repo_url: String,
     detected_port: Option<i32>,
@@ -78,8 +79,8 @@ struct DeploymentOut {
     created_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize)]
-struct Paging {
+#[derive(Deserialize, IntoParams)]
+pub(crate) struct Paging {
     page: Option<i64>,
     limit: Option<i64>,
 }
@@ -93,7 +94,21 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/run", post(run_container))
 }
 
-async fn create_deployment(
+#[utoipa::path(
+    post,
+    path = "/deployments",
+    tag = "deployments",
+    request_body = CreateDeploymentRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 201, description = "Deployment created and build started in the background", body = DeploymentOut),
+        (status = 400, description = "Invalid repo_url, custom_port, or container not running", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 404, description = "No container found - create one first", body = crate::errors::ErrorResponse),
+        (status = 409, description = "Deployment already in progress for this repository", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn create_deployment(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<CreateDeploymentRequest>,
@@ -210,7 +225,18 @@ async fn create_deployment(
     ))
 }
 
-async fn list_deployments(
+#[utoipa::path(
+    get,
+    path = "/deployments",
+    tag = "deployments",
+    params(Paging),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Paginated list of the current user's deployments", body = [DeploymentOut]),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn list_deployments(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(paging): Query<Paging>,
@@ -252,7 +278,19 @@ async fn list_deployments(
     Ok(Json(out))
 }
 
-async fn get_deployment(
+#[utoipa::path(
+    get,
+    path = "/deployments/{deployment_id}",
+    tag = "deployments",
+    params(("deployment_id" = Uuid, Path, description = "Deployment ID")),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Deployment details", body = DeploymentOut),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Deployment not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn get_deployment(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(deployment_id): Path<Uuid>,
@@ -284,7 +322,20 @@ async fn get_deployment(
     }))
 }
 
-async fn cancel_deployment(
+#[utoipa::path(
+    post,
+    path = "/deployments/{deployment_id}/cancel",
+    tag = "deployments",
+    params(("deployment_id" = Uuid, Path, description = "Deployment ID")),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Deployment cancelled"),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires ownership, or admin/professor role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Deployment not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn cancel_deployment(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(deployment_id): Path<Uuid>,
@@ -647,7 +698,19 @@ fn detect_port_from_dockerfile(content: &str) -> Option<i32> {
     caps.get(1)?.as_str().parse::<i32>().ok()
 }
 
-async fn build_image(
+#[utoipa::path(
+    post,
+    path = "/deployments/build",
+    tag = "deployments",
+    request_body = BuildRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Docker image build result", body = BuildResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn build_image(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<BuildRequest>,
@@ -771,7 +834,19 @@ async fn build_image_inner(state: &AppState, payload: BuildRequest) -> Result<Bu
     })
 }
 
-async fn run_container(
+#[utoipa::path(
+    post,
+    path = "/deployments/run",
+    tag = "deployments",
+    request_body = RunRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Container started from the built image", body = RunResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn run_container(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<RunRequest>,

@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::{
@@ -31,8 +32,8 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/:user_id", patch(update_user))
 }
 
-#[derive(Debug, Serialize)]
-struct UserOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct UserOut {
     id: Uuid,
     email: String,
     full_name: String,
@@ -42,7 +43,17 @@ struct UserOut {
     created_at: DateTime<Utc>,
 }
 
-async fn get_me(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Result<Json<UserOut>> {
+#[utoipa::path(
+    get,
+    path = "/users/me",
+    tag = "users",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Current authenticated user", body = UserOut),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn get_me(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Result<Json<UserOut>> {
     let me = current_user(&state, &headers).await?;
     let row = sqlx::query(
         r#"
@@ -67,12 +78,23 @@ async fn get_me(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Resul
     }))
 }
 
-#[derive(Debug, Deserialize)]
-struct UpdateProfileRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct UpdateProfileRequest {
     full_name: Option<String>,
 }
 
-async fn update_profile(
+#[utoipa::path(
+    patch,
+    path = "/users/me",
+    tag = "users",
+    request_body = UpdateProfileRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Updated user profile", body = UserOut),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn update_profile(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<UpdateProfileRequest>,
@@ -90,13 +112,25 @@ async fn update_profile(
     get_me(State(state), headers).await
 }
 
-#[derive(Debug, Deserialize)]
-struct ChangePasswordRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct ChangePasswordRequest {
     current_password: String,
     new_password: String,
 }
 
-async fn change_password(
+#[utoipa::path(
+    post,
+    path = "/users/me/change-password",
+    tag = "users",
+    request_body = ChangePasswordRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Password updated successfully"),
+        (status = 400, description = "New password does not meet strength requirements", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing token or incorrect current password", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn change_password(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<ChangePasswordRequest>,
@@ -128,7 +162,18 @@ async fn change_password(
     ))
 }
 
-async fn delete_account(
+#[utoipa::path(
+    delete,
+    path = "/users/me",
+    tag = "users",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 204, description = "Account deleted"),
+        (status = 400, description = "Admin accounts cannot be self-deleted", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn delete_account(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<StatusCode> {
@@ -147,13 +192,25 @@ async fn delete_account(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(Debug, Deserialize)]
-struct Paging {
+#[derive(Debug, Deserialize, IntoParams)]
+pub(crate) struct Paging {
     page: Option<i64>,
     limit: Option<i64>,
 }
 
-async fn list_users(
+#[utoipa::path(
+    get,
+    path = "/users",
+    tag = "users",
+    params(Paging),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Paginated list of users", body = [UserOut]),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin or professor role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn list_users(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(paging): Query<Paging>,
@@ -183,14 +240,27 @@ async fn list_users(
     Ok(Json(rows_to_users(rows)?))
 }
 
-#[derive(Debug, Deserialize)]
-struct StudentsQuery {
+#[derive(Debug, Deserialize, IntoParams)]
+pub(crate) struct StudentsQuery {
     page: Option<i64>,
     limit: Option<i64>,
     class_id: Option<Uuid>,
 }
 
-async fn list_students(
+#[utoipa::path(
+    get,
+    path = "/users/students",
+    tag = "users",
+    params(StudentsQuery),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Paginated list of students", body = [UserOut]),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires professor role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Class not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn list_students(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(query): Query<StudentsQuery>,
@@ -254,14 +324,29 @@ async fn list_students(
     Ok(Json(rows_to_users(rows)?))
 }
 
-#[derive(Debug, Deserialize)]
-struct UpdateUserRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct UpdateUserRequest {
     full_name: Option<String>,
     role: Option<String>,
     is_active: Option<bool>,
 }
 
-async fn update_user(
+#[utoipa::path(
+    patch,
+    path = "/users/{user_id}",
+    tag = "users",
+    params(("user_id" = Uuid, Path, description = "User ID")),
+    request_body = UpdateUserRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Updated user", body = UserOut),
+        (status = 400, description = "Invalid role", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "User not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn update_user(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(user_id): Path<Uuid>,

@@ -8,6 +8,8 @@ use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 mod auth;
 mod config;
@@ -18,11 +20,18 @@ mod handlers;
 mod jobs;
 mod middleware;
 mod models;
+mod openapi;
 mod sleep;
 mod state;
 mod wireguard;
 
 pub use state::AppState;
+
+fn api_doc() -> utoipa::openapi::OpenApi {
+    let mut doc = openapi::ApiDoc::openapi();
+    doc.servers = Some(vec![utoipa::openapi::Server::new(config::api_base_url())]);
+    doc
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -96,6 +105,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/containers", handlers::containers::router())
         .nest("/deployments", handlers::deployments::router())
         .nest("/monitor", handlers::monitor::router())
+        .merge(SwaggerUi::new("/docs").url("/openapi.json", api_doc()))
         .layer(cors)
         .with_state(state);
 

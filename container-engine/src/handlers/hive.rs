@@ -9,6 +9,7 @@ use axum::{
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
@@ -26,8 +27,8 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/heartbeat", post(heartbeat))
 }
 
-#[derive(Debug, Serialize)]
-struct HiveNodeOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct HiveNodeOut {
     id: String,
     role: String,
     host: String,
@@ -42,7 +43,18 @@ struct HiveNodeOut {
     online: bool,
 }
 
-async fn list_nodes(
+#[utoipa::path(
+    get,
+    path = "/hive/nodes",
+    tag = "hive",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "List of hive nodes with their current metrics", body = [HiveNodeOut]),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin or professor role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn list_nodes(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<HiveNodeOut>>> {
@@ -86,13 +98,24 @@ async fn list_nodes(
     Ok(Json(nodes))
 }
 
-#[derive(Debug, Serialize)]
-struct JoinInfoOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct JoinInfoOut {
     join_token: String,
     join_command: String,
 }
 
-async fn join_info(
+#[utoipa::path(
+    get,
+    path = "/hive/join-info",
+    tag = "hive",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Join token and ready-to-run join command for a new worker node", body = JoinInfoOut),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn join_info(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<JoinInfoOut>> {
@@ -116,8 +139,8 @@ async fn join_info(
     }))
 }
 
-#[derive(Debug, Deserialize)]
-struct JoinRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct JoinRequest {
     token: String,
     node_id: String,
     role: Option<String>,
@@ -136,14 +159,25 @@ struct JoinRequest {
     wireguard_active: Option<bool>,
 }
 
-#[derive(Debug, Serialize)]
-struct JoinResponse {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct JoinResponse {
     node_uuid: Uuid,
     node_id: String,
     accepted: bool,
 }
 
-async fn join_hive(
+#[utoipa::path(
+    post,
+    path = "/hive/join",
+    tag = "hive",
+    request_body = JoinRequest,
+    responses(
+        (status = 200, description = "Node registered or updated in the hive", body = JoinResponse),
+        (status = 400, description = "Invalid join token, node identity, or WireGuard key", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Invalid join token", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn join_hive(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<JoinRequest>,
 ) -> Result<(StatusCode, Json<JoinResponse>)> {
@@ -261,8 +295,8 @@ async fn join_hive(
     ))
 }
 
-#[derive(Debug, Deserialize)]
-struct HeartbeatRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct HeartbeatRequest {
     token: String,
     node_id: String,
     ram_used: Option<f64>,
@@ -273,13 +307,25 @@ struct HeartbeatRequest {
     deployments: Option<i32>,
 }
 
-#[derive(Debug, Serialize)]
-struct HeartbeatResponse {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct HeartbeatResponse {
     accepted: bool,
     last_heartbeat: String,
 }
 
-async fn heartbeat(
+#[utoipa::path(
+    post,
+    path = "/hive/heartbeat",
+    tag = "hive",
+    request_body = HeartbeatRequest,
+    responses(
+        (status = 200, description = "Heartbeat recorded", body = HeartbeatResponse),
+        (status = 400, description = "Invalid join token or node_id", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Invalid join token", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Node not registered", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn heartbeat(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<HeartbeatRequest>,
 ) -> Result<Json<HeartbeatResponse>> {

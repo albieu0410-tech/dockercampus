@@ -7,6 +7,7 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
+use utoipa::IntoParams;
 use uuid::Uuid;
 
 use crate::{
@@ -23,13 +24,25 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/:job_id/cancel", post(cancel_job))
 }
 
-#[derive(Debug, Deserialize)]
-struct JobQuery {
+#[derive(Debug, Deserialize, IntoParams)]
+pub(crate) struct JobQuery {
     status: Option<String>,
     limit: Option<i64>,
 }
 
-async fn list_jobs(
+#[utoipa::path(
+    get,
+    path = "/jobs",
+    tag = "jobs",
+    params(JobQuery),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "List of background jobs", body = [jobs::JobRecord]),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin or professor role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn list_jobs(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(query): Query<JobQuery>,
@@ -48,14 +61,27 @@ async fn list_jobs(
     Ok(Json(out))
 }
 
-#[derive(Debug, Deserialize)]
-struct CreateJobRequest {
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub(crate) struct CreateJobRequest {
     job_type: String,
     payload: Option<serde_json::Value>,
     max_retries: Option<i32>,
 }
 
-async fn create_job(
+#[utoipa::path(
+    post,
+    path = "/jobs",
+    tag = "jobs",
+    request_body = CreateJobRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 201, description = "Job created", body = jobs::JobRecord),
+        (status = 400, description = "job_type is required", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn create_job(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<CreateJobRequest>,
@@ -75,7 +101,20 @@ async fn create_job(
     Ok((StatusCode::CREATED, Json(job)))
 }
 
-async fn retry_job(
+#[utoipa::path(
+    post,
+    path = "/jobs/{job_id}/retry",
+    tag = "jobs",
+    params(("job_id" = Uuid, Path, description = "Job ID")),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Job scheduled for retry", body = jobs::JobRecord),
+        (status = 400, description = "Job not retryable or not found", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn retry_job(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(job_id): Path<Uuid>,
@@ -90,7 +129,20 @@ async fn retry_job(
     Ok(Json(job))
 }
 
-async fn cancel_job(
+#[utoipa::path(
+    post,
+    path = "/jobs/{job_id}/cancel",
+    tag = "jobs",
+    params(("job_id" = Uuid, Path, description = "Job ID")),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Job cancelled", body = jobs::JobRecord),
+        (status = 400, description = "Job not cancellable or not found", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn cancel_job(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(job_id): Path<Uuid>,

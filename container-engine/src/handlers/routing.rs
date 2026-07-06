@@ -10,6 +10,7 @@ use chrono::{Duration, Utc};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use utoipa::ToSchema;
 
 use crate::{
     errors::{AppError, Result},
@@ -31,16 +32,16 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/decide", post(decide_route))
 }
 
-#[derive(Debug, Serialize)]
-struct RoutingStateOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct RoutingStateOut {
     strategy: String,
     canary_active: bool,
     canary_percent: i32,
     nodes: Vec<RouteNodeOut>,
 }
 
-#[derive(Debug, Serialize)]
-struct RouteNodeOut {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct RouteNodeOut {
     id: String,
     reqs: i64,
     rt: f64,
@@ -55,7 +56,18 @@ struct RouteNodeOut {
     online: bool,
 }
 
-async fn get_state(
+#[utoipa::path(
+    get,
+    path = "/routing/state",
+    tag = "routing",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Routing strategy, canary config, and per-node metrics", body = RoutingStateOut),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin or professor role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn get_state(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<RoutingStateOut>> {
@@ -80,12 +92,25 @@ async fn get_state(
     }))
 }
 
-#[derive(Debug, Deserialize)]
-struct SetStrategyRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct SetStrategyRequest {
     strategy: String,
 }
 
-async fn set_strategy(
+#[utoipa::path(
+    put,
+    path = "/routing/strategy",
+    tag = "routing",
+    request_body = SetStrategyRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Strategy updated"),
+        (status = 400, description = "Unsupported routing strategy", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn set_strategy(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<SetStrategyRequest>,
@@ -103,13 +128,26 @@ async fn set_strategy(
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
-#[derive(Debug, Deserialize)]
-struct SetCanaryRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct SetCanaryRequest {
     active: bool,
     percent: i32,
 }
 
-async fn set_canary(
+#[utoipa::path(
+    put,
+    path = "/routing/canary",
+    tag = "routing",
+    request_body = SetCanaryRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Canary config updated"),
+        (status = 400, description = "percent must be between 0 and 100", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn set_canary(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<SetCanaryRequest>,
@@ -132,8 +170,8 @@ async fn set_canary(
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
-#[derive(Debug, Deserialize)]
-struct UpdateNodeRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct UpdateNodeRequest {
     weight: Option<i32>,
     active_connections: Option<i32>,
     avg_response_ms: Option<f64>,
@@ -141,7 +179,22 @@ struct UpdateNodeRequest {
     is_canary: Option<bool>,
 }
 
-async fn update_node_metrics(
+#[utoipa::path(
+    put,
+    path = "/routing/nodes/{node_id}",
+    tag = "routing",
+    params(("node_id" = String, Path, description = "Hive node ID")),
+    request_body = UpdateNodeRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Node metrics updated"),
+        (status = 400, description = "Invalid metric value", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Hive node not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn update_node_metrics(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(node_id): Path<String>,
@@ -195,12 +248,27 @@ async fn update_node_metrics(
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
-#[derive(Debug, Deserialize)]
-struct SetCircuitRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct SetCircuitRequest {
     state: String,
 }
 
-async fn set_circuit_state(
+#[utoipa::path(
+    post,
+    path = "/routing/nodes/{node_id}/circuit",
+    tag = "routing",
+    params(("node_id" = String, Path, description = "Hive node ID")),
+    request_body = SetCircuitRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Circuit breaker state updated"),
+        (status = 400, description = "Invalid circuit state or transition", body = crate::errors::ErrorResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "Hive node not found", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn set_circuit_state(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(node_id): Path<String>,
@@ -235,13 +303,13 @@ async fn set_circuit_state(
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
-#[derive(Debug, Deserialize)]
-struct DecideRequest {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct DecideRequest {
     client_id: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-struct DecideResponse {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct DecideResponse {
     node_id: String,
     host: String,
     ip: String,
@@ -249,7 +317,20 @@ struct DecideResponse {
     canary: bool,
 }
 
-async fn decide_route(
+#[utoipa::path(
+    post,
+    path = "/routing/decide",
+    tag = "routing",
+    request_body = DecideRequest,
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Selected routing target for this request", body = DecideResponse),
+        (status = 401, description = "Missing or invalid token", body = crate::errors::ErrorResponse),
+        (status = 403, description = "Requires admin, professor, or student role", body = crate::errors::ErrorResponse),
+        (status = 404, description = "No online routing nodes available", body = crate::errors::ErrorResponse)
+    )
+)]
+pub(crate) async fn decide_route(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<DecideRequest>,

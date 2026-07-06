@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::errors::Result;
@@ -11,7 +12,7 @@ pub const JOB_DONE: &str = "done";
 pub const JOB_FAILED: &str = "failed";
 pub const JOB_CANCELLED: &str = "cancelled";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct JobRecord {
     pub id: Uuid,
     pub job_type: String,
