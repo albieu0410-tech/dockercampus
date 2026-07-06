@@ -62,6 +62,36 @@ pub fn router() -> Router<Arc<AppState>> {
             "/app/:user_id/*path",
             axum::routing::head(proxy_to_container_http),
         )
+        .route("/app/:user_id/proxy/:port", get(proxy_deployment_root_get))
+        .route("/app/:user_id/proxy/:port/", get(proxy_deployment_root_get))
+        .route(
+            "/app/:user_id/proxy/:port/*path",
+            get(proxy_or_ws_deployment_get),
+        )
+        .route(
+            "/app/:user_id/proxy/:port/*path",
+            post(proxy_deployment_http),
+        )
+        .route(
+            "/app/:user_id/proxy/:port/*path",
+            delete(proxy_deployment_http),
+        )
+        .route(
+            "/app/:user_id/proxy/:port/*path",
+            axum::routing::put(proxy_deployment_http),
+        )
+        .route(
+            "/app/:user_id/proxy/:port/*path",
+            axum::routing::patch(proxy_deployment_http),
+        )
+        .route(
+            "/app/:user_id/proxy/:port/*path",
+            axum::routing::options(proxy_deployment_http),
+        )
+        .route(
+            "/app/:user_id/proxy/:port/*path",
+            axum::routing::head(proxy_deployment_http),
+        )
         .route("/:user_id/exec", post(exec_in_container))
         .route("/:user_id/start", post(start_container))
         .route("/:user_id/stop", post(stop_container))
@@ -650,6 +680,133 @@ async fn proxy_http_inner(
         .into_response())
 }
 
+#[utoipa::path(
+    get,
+    path = "/containers/app/{user_id}/proxy/{port}",
+    tag = "containers",
+    params(
+        ("user_id" = String, Path, description = "Owning student user ID"),
+        ("port" = i32, Path, description = "Host-published port of a running deployment")
+    ),
+    responses(
+        (status = 200, description = "Proxied response from the deployed app's root"),
+        (status = 502, description = "Deployment is not reachable on that port")
+    )
+)]
+pub(crate) async fn proxy_deployment_root_get(
+    State(state): State<Arc<AppState>>,
+    Path((_user_id, port)): Path<(String, i32)>,
+    RawQuery(query): RawQuery,
+    headers: HeaderMap,
+) -> Result<Response> {
+    proxy_deployment_http_inner(&state, port, "", query, Method::GET, headers, None).await
+}
+
+#[utoipa::path(
+    post,
+    path = "/containers/app/{user_id}/proxy/{port}/{path}",
+    tag = "containers",
+    params(
+        ("user_id" = String, Path, description = "Owning student user ID"),
+        ("port" = i32, Path, description = "Host-published port of a running deployment"),
+        ("path" = String, Path, description = "Sub-path forwarded to the deployed app (also handles PUT, PATCH, DELETE, OPTIONS, HEAD)")
+    ),
+    responses(
+        (status = 200, description = "Proxied response from the deployed app"),
+        (status = 502, description = "Deployment is not reachable on that port")
+    )
+)]
+pub(crate) async fn proxy_deployment_http(
+    State(state): State<Arc<AppState>>,
+    Path((_user_id, port, path)): Path<(String, i32, String)>,
+    RawQuery(query): RawQuery,
+    method: Method,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response> {
+    proxy_deployment_http_inner(&state, port, &path, query, method, headers, Some(body)).await
+}
+
+#[utoipa::path(
+    get,
+    path = "/containers/app/{user_id}/proxy/{port}/{path}",
+    tag = "containers",
+    params(
+        ("user_id" = String, Path, description = "Owning student user ID"),
+        ("port" = i32, Path, description = "Host-published port of a running deployment"),
+        ("path" = String, Path, description = "Sub-path forwarded to the deployed app")
+    ),
+    responses(
+        (status = 101, description = "WebSocket upgrade bridged to the deployed app"),
+        (status = 200, description = "Proxied HTTP response from the deployed app"),
+        (status = 502, description = "Deployment is not reachable on that port")
+    )
+)]
+pub(crate) async fn proxy_or_ws_deployment_get(
+    ws: Option<WebSocketUpgrade>,
+    State(state): State<Arc<AppState>>,
+    Path((_user_id, port, path)): Path<(String, i32, String)>,
+    RawQuery(query): RawQuery,
+    headers: HeaderMap,
+) -> Result<Response> {
+    if let Some(ws) = ws {
+        let mut target_url = format!("ws://host.docker.internal:{}/{}", port, path);
+        if let Some(q) = query.as_deref().filter(|q| !q.is_empty()) {
+            target_url.push('?');
+            target_url.push_str(q);
+        }
+
+        return Ok(ws
+            .on_upgrade(move |socket| bridge_websocket(socket, target_url, headers))
+            .into_response());
+    }
+
+    proxy_deployment_http_inner(&state, port, &path, query, Method::GET, headers, None).await
+}
+
+async fn proxy_deployment_http_inner(
+    state: &AppState,
+    port: i32,
+    path: &str,
+    query: Option<String>,
+    method: Method,
+    headers: HeaderMap,
+    body: Option<Bytes>,
+) -> Result<Response> {
+    let mut target_url = format!("http://host.docker.internal:{}/{}", port, path);
+    if let Some(query) = query.as_deref().filter(|q| !q.is_empty()) {
+        target_url.push('?');
+        target_url.push_str(query);
+    }
+
+    let reqwest_method =
+        reqwest::Method::from_bytes(method.as_str().as_bytes()).map_err(anyhow::Error::from)?;
+    let mut req_builder = state.http_client.request(reqwest_method, target_url);
+    for (name, value) in &headers {
+        if should_skip_proxy_header(name.as_str()) {
+            continue;
+        }
+        req_builder = req_builder.header(name, value);
+    }
+    if let Some(body) = body {
+        req_builder = req_builder.body(body);
+    }
+
+    let upstream = req_builder.send().await.map_err(anyhow::Error::from)?;
+    let status = upstream.status();
+    let mut resp = axum::http::Response::builder().status(status.as_u16());
+    for (name, value) in upstream.headers() {
+        if !should_skip_response_header(name.as_str()) {
+            resp = resp.header(name, value);
+        }
+    }
+    let bytes = upstream.bytes().await.map_err(anyhow::Error::from)?;
+    Ok(resp
+        .body(axum::body::Body::from(bytes))
+        .map_err(anyhow::Error::from)?
+        .into_response())
+}
+
 async fn bridge_websocket(
     socket: axum::extract::ws::WebSocket,
     target_url: String,
@@ -764,4 +921,14 @@ fn should_skip_proxy_header(name: &str) -> bool {
 
 fn should_skip_response_header(name: &str) -> bool {
     matches!(name.to_ascii_lowercase().as_str(), "transfer-encoding")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::router;
+
+    #[test]
+    fn router_builds_without_route_conflicts() {
+        let _ = router();
+    }
 }

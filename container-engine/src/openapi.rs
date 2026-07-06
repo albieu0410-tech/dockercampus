@@ -118,7 +118,10 @@ impl Modify for SecurityAddon {
         handlers::containers::exec_in_container,
         handlers::containers::proxy_container_root_get,
         handlers::containers::proxy_to_container_http,
-        handlers::containers::proxy_or_ws_to_container_get
+        handlers::containers::proxy_or_ws_to_container_get,
+        handlers::containers::proxy_deployment_root_get,
+        handlers::containers::proxy_deployment_http,
+        handlers::containers::proxy_or_ws_deployment_get
     ),
     components(schemas(crate::errors::ErrorResponse))
 )]
